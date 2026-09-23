@@ -97,8 +97,27 @@ class UdpServer:
             client_id = validate_client_id(message.client_id)
         except WardlineError as caught:
             self._audit(caught.code, host)
-            self._reply_error(addr, caught.code, caught.message)
+            if self.state.rate_limiter.allow(f"udp-invalid:{host}"):
+                self._reply_error(addr, caught.code, caught.message)
             return
+
+        assert message.seq is not None
+        self._note_seq(client_id, message.seq)
+        
+        token = message.token
+        if not isinstance(token, str) or not token:
+            self._audit_auth_failure(client_id, "missing")
+            if self.state.rate_limiter.allow(f"udp-invalid:{host}"):
+                self._reply_error(addr, ErrorCode.invalid_message, "invalid message")
+            return
+            
+        principal = self.state.auth.authenticate_request(token, client_id=client_id)
+        if principal is None or not principal.authenticated:
+            self._audit_auth_failure(client_id, "mismatch")
+            if self.state.rate_limiter.allow(f"udp-invalid:{host}"):
+                self._reply_error(addr, ErrorCode.unauthorized, "unauthorized")
+            return
+
         if not self.state.rate_limiter.allow(f"udp:{client_id}"):
             self.state.udp_stats.bump("datagrams_dropped")
             rate_event = SecurityEvent(
@@ -114,18 +133,7 @@ class UdpServer:
             self.state.events.add(rate_event)
             self.state.audit.append(rate_event)
             return
-        assert message.seq is not None
-        self._note_seq(client_id, message.seq)
-        token = message.token
-        if not isinstance(token, str) or not token:
-            self._audit_auth_failure(client_id, "missing")
-            self._reply_error(addr, ErrorCode.unauthorized, "unauthorized")
-            return
-        principal = self.state.auth.authenticate_request(token, client_id=client_id)
-        if principal is None or not principal.authenticated:
-            self._audit_auth_failure(client_id, "mismatch")
-            self._reply_error(addr, ErrorCode.unauthorized, "unauthorized")
-            return
+            
         role = principal.role
         if message.type == "beacon":
             reply: dict[str, Any] = {

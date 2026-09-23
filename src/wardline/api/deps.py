@@ -9,7 +9,7 @@ from starlette.requests import Request
 from wardline.auth.policy import role_allows
 from wardline.clients.identity import validate_client_id
 from wardline.contracts import ErrorCode, Principal, Role, SecurityEvent, ServiceName, Severity
-from wardline.errors import WardlineError
+from wardline.errors import RateLimitedError, WardlineError
 from wardline.runtime import AppState
 
 
@@ -123,3 +123,39 @@ def require_role(*allowed: Role) -> Callable[..., Principal]:
         return principal
 
     return dependency
+
+
+
+def check_rate_limit(request: Request, state: LabState) -> None:
+    host = request.client.host if request.client is not None else "unknown"
+    key = f"anon:{host}"
+    
+    # Extract client_id manually if authorized, because we can't easily access principal
+    auth_header = request.headers.get("authorization")
+    api_key_header = request.headers.get("x-api-key")
+    token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+    elif api_key_header:
+        token = api_key_header
+        
+    client_id_header = request.headers.get("x-client-id")
+    
+    if token:
+        from wardline.clients.identity import validate_client_id
+        from wardline.errors import WardlineError
+        valid_client_id = None
+        if client_id_header:
+            try:
+                valid_client_id = validate_client_id(client_id_header)
+            except WardlineError:
+                pass
+        
+        principal = state.auth.authenticate_request(token, client_id=valid_client_id)
+        if principal and principal.authenticated:
+            key = principal.client_id
+            
+    if not state.rate_limiter.allow(key):
+        state.metrics.bump("http", "rate_limited_total")
+        retry = state.rate_limiter.retry_after(key)
+        raise RateLimitedError("rate limited", retry_after=retry, source=key)

@@ -102,11 +102,14 @@ def create_app(state: AppState | None = None) -> FastAPI:
     app.state.lab = lab
     app.add_middleware(RequestContextMiddleware, lab=lab)
 
-    public_router = APIRouter()
+    from wardline.api.deps import check_rate_limit
+    public_router = APIRouter(dependencies=[Depends(check_rate_limit)])
     public_router.include_router(health_router)
     public_router.include_router(version_router)
 
-    authed_router = APIRouter(dependencies=[Depends(require_role(Role.VIEWER))])
+    authed_router = APIRouter(
+        dependencies=[Depends(require_role(Role.VIEWER)), Depends(check_rate_limit)]
+    )
     authed_router.include_router(status_router)
 
     app.include_router(public_router)
@@ -156,7 +159,7 @@ def _install_handlers(app: FastAPI) -> None:
             app.state.lab.audit.append(
                 SecurityEvent(
                     timestamp=app.state.lab.clock.now(),
-                    source="http",
+                    source=getattr(exc, "source", "http"),
                     service=ServiceName.HTTP,
                     event_type=exc.code.value,
                     severity=Severity.LOW,
@@ -168,6 +171,8 @@ def _install_handlers(app: FastAPI) -> None:
         headers: dict[str, str] = {}
         if exc.code == ErrorCode.unauthorized:
             headers["WWW-Authenticate"] = 'Bearer realm="wardline"'
+        if exc.code == ErrorCode.rate_limited and hasattr(exc, "retry_after"):
+            headers["Retry-After"] = str(exc.retry_after)
         return JSONResponse(
             status_code=status_for(exc.code),
             content=wardline_error_payload(exc, correlation_id),

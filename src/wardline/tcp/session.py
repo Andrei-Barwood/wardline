@@ -118,13 +118,17 @@ class TcpSession:
         except WardlineError as caught:
             await self._fail(caught.code, caught.message, None, closing=True)
             return "stop"
-        self.client_id = client_id
-        if not self._allow_rate():
+            
+        ip = self.writer.get_extra_info("peername")[0]
+        
+        if not self.state.rate_limiter.allow(f"tcp:{client_id}"):
             closing = self._note_error(ErrorCode.rate_limited)
             await self._fail(ErrorCode.rate_limited, "rate limited", None, closing=closing)
             return "stop" if closing else "again"
+            
         token = message.token
         if not isinstance(token, str) or not token:
+            self.state.rate_limiter.allow(f"tcp-unauth:{ip}")
             self.state.audit.append(
                 SecurityEvent(
                     timestamp=self.state.clock.now(),
@@ -138,11 +142,12 @@ class TcpSession:
                     details={"reason": "missing"},
                 )
             )
-            await self._fail(ErrorCode.unauthorized, "unauthorized", None, closing=True)
+            await self._fail(ErrorCode.invalid_message, "invalid message", None, closing=True)
             return "stop"
 
         principal = self.state.auth.authenticate_request(token, client_id=client_id)
         if principal is None or not principal.authenticated:
+            self.state.rate_limiter.allow(f"tcp-unauth:{ip}")
             self.state.audit.append(
                 SecurityEvent(
                     timestamp=self.state.clock.now(),
@@ -159,6 +164,7 @@ class TcpSession:
             await self._fail(ErrorCode.unauthorized, "unauthorized", None, closing=True)
             return "stop"
 
+        self.client_id = client_id
         self.principal = principal
         self.stats.bump("messages_valid")
         await self._send(
@@ -169,7 +175,7 @@ class TcpSession:
                 "session_id": self.session_id,
             }
         )
-        return "ok"
+        return "ok" 
 
     async def _dispatch(self, message: "TcpCommand") -> bool:
         message_type = message.type
@@ -256,7 +262,9 @@ class TcpSession:
         )
 
     def _allow_rate(self) -> bool:
-        key = f"tcp:{self.client_id}" if self.client_id is not None else "tcp:pre-hello"
+        if self.client_id is None:
+            return True
+        key = f"tcp:{self.client_id}"
         return self.state.rate_limiter.allow(key)
 
     def _note_error(self, code: ErrorCode) -> bool:

@@ -36,7 +36,7 @@ async def test_health_stays_public_without_key(api_client: httpx.AsyncClient) ->
 async def test_bearer_and_x_api_key_both_work(
     settings_factory: Callable[..., Settings],
 ) -> None:
-    state = build_state(settings_factory())
+    state = build_state(settings_factory(rate_limit_burst=10))
     app = create_app(state)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
@@ -59,7 +59,7 @@ async def test_bearer_and_x_api_key_both_work(
 async def test_mismatched_headers_rejected(
     settings_factory: Callable[..., Settings],
 ) -> None:
-    state = build_state(settings_factory())
+    state = build_state(settings_factory(rate_limit_burst=10))
     app = create_app(state)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
@@ -73,7 +73,7 @@ async def test_mismatched_headers_rejected(
 async def test_auth_failure_is_audited_without_token_value(
     settings_factory: Callable[..., Settings],
 ) -> None:
-    state = build_state(settings_factory())
+    state = build_state(settings_factory(rate_limit_burst=10))
     audit = MemoryAuditLog(clock=state.clock)
     state.audit = audit
     app = create_app(state)
