@@ -17,7 +17,9 @@ async def test_each_scenario_event_type_and_flag():
     state = build_state(Settings(wardline_env="test", database_url="sqlite:///:memory:"))
     await simulate_burst(state, mode=SimulationMode.inprocess)
 
-    events = state.events.list_events(limit=10)
+    events = [
+        e for e in state.events.list_events(limit=10) if not e.event_type.startswith("anomaly_")
+    ]
     assert len(events) == 5
     for ev in events:
         assert ev.event_type == "simulated_rate_abuse"
@@ -29,7 +31,9 @@ async def test_each_scenario_event_type_and_flag():
 async def test_simulate_all_runs_four():
     state = build_state(Settings(wardline_env="test", database_url="sqlite:///:memory:"))
     result = await simulate_all(state, mode=SimulationMode.inprocess)
-    events = state.events.list_events(limit=100)
+    events = [
+        e for e in state.events.list_events(limit=100) if not e.event_type.startswith("anomaly_")
+    ]
     assert len(events) == 16
     assert result.events_recorded == 16
 

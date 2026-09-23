@@ -85,7 +85,7 @@ def build_state(settings: Settings, *, clock: Clock | None = None) -> AppState:
         circuit_breakers=CircuitBreakerRegistry(),
         audit=NullAuditLog(),
         config_history=MemoryConfigHistory(),
-        anomaly=AnomalyDetector(),
+        anomaly=AnomalyDetector(clock=active_clock),
         bindings={
             "http": f"{settings.http_host}:{settings.http_port}",
             "tcp": f"{settings.tcp_host}:{settings.tcp_port}",

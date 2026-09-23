@@ -83,7 +83,7 @@ def test_null_components_do_not_raise() -> None:
     assert body["tcp"]["bytes_in"] == 3
     assert state.circuit_breakers.allow(ServiceName.TCP) is True
     state.circuit_breakers.record_failure(ServiceName.TCP)
-    assert state.anomaly.observe(event) == []
+    assert state.anomaly.observe(event, history=[event], open_incident=lambda **kwargs: None) == []
     assert state.config_history.push({"log_level": "INFO"}) == 1
     assert state.config_history.previous() == {"log_level": "INFO"}
     incident = Incident(

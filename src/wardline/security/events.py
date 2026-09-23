@@ -69,4 +69,22 @@ def record_event(state: AppState, event: SecurityEvent) -> None:
     except Exception:
         logging.getLogger("wardline.security").error("failed to append to audit log")
 
-    # Later: trigger anomaly detection
+    # 5. Trigger anomaly detection
+    # Do not observe recursively if this is an anomaly event itself
+    if not new_event.event_type.startswith("anomaly_"):
+        try:
+            from wardline.incidents.service import IncidentService
+
+            # We get all events from the repository up to a limit
+            # "list_events con un límite interno de 500 y filtra por timestamp en memoria"
+            history = state.events.list_events(limit=500)
+
+            anomalies = state.anomaly.observe(
+                new_event,
+                history=history,
+                open_incident=lambda **kwargs: IncidentService.open_if_needed(state, **kwargs),
+            )
+            for anomaly in anomalies:
+                record_event(state, anomaly)
+        except Exception:
+            logging.getLogger("wardline.security").error("failed to observe anomaly", exc_info=True)
