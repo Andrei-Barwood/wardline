@@ -1,0 +1,40 @@
+app_name = "wardline"
+environment = "local"
+log_level = "INFO"
+log_format = "json"
+
+http_host = "127.0.0.1"
+http_port = 8080
+tcp_host = "127.0.0.1"
+tcp_port = 9001
+udp_host = "127.0.0.1"
+udp_port = 9002
+
+tcp_max_connections = 32
+tcp_read_timeout_seconds = 5.0
+tcp_idle_timeout_seconds = 30.0
+tcp_max_message_bytes = 4096
+tcp_max_errors_per_session = 5
+
+udp_max_datagram_bytes = 1024
+udp_packets_per_second = 20
+
+http_max_body_bytes = 65536
+database_url = "sqlite:///./data/wardline.db"
+
+rate_limit_requests_per_minute = 60
+rate_limit_burst = 10
+quota_events_per_client = 1000
+
+circuit_failure_threshold = 5
+circuit_window_seconds = 10.0
+circuit_open_seconds = 15.0
+
+block_ttl_seconds = 300
+anomaly_incident_min_severity = "HIGH"
+
+simulation_mode_default = "inprocess"
+simulation_max_events = 50
+simulation_loopback_max_connections = 8
+simulation_loopback_max_datagrams = 20
+simulation_loopback_max_seconds = 2.0
