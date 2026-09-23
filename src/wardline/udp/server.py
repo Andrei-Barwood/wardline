@@ -94,7 +94,7 @@ class UdpServer:
             return
         try:
             message = parse_datagram(data, max_bytes=self.state.settings.udp_max_datagram_bytes)
-            client_id = validate_client_id(message.get("client_id"))
+            client_id = validate_client_id(message.client_id)
         except WardlineError as caught:
             self._audit(caught.code, host)
             self._reply_error(addr, caught.code, caught.message)
@@ -114,8 +114,9 @@ class UdpServer:
             self.state.events.add(rate_event)
             self.state.audit.append(rate_event)
             return
-        self._note_seq(client_id, int(message["seq"]))
-        token = message.get("token")
+        assert message.seq is not None
+        self._note_seq(client_id, message.seq)
+        token = message.token
         if not isinstance(token, str) or not token:
             self._audit_auth_failure(client_id, "missing")
             self._reply_error(addr, ErrorCode.unauthorized, "unauthorized")
@@ -126,20 +127,20 @@ class UdpServer:
             self._reply_error(addr, ErrorCode.unauthorized, "unauthorized")
             return
         role = principal.role
-        if message["type"] == "beacon":
+        if message.type == "beacon":
             reply: dict[str, Any] = {
                 "type": "beacon_ack",
                 "client_id": client_id,
-                "seq": message["seq"],
+                "seq": message.seq,
                 "role": role.value,
             }
         else:
-            request_id = message.get("request_id")
+            request_id = message.request_id
             if not isinstance(request_id, str) or not request_id:
                 self._audit(ErrorCode.invalid_message, client_id)
                 self._reply_error(addr, ErrorCode.invalid_message, "invalid message")
                 return
-            reply = {"type": "pong", "request_id": request_id, "seq": message["seq"]}
+            reply = {"type": "pong", "request_id": request_id, "seq": message.seq}
         self._send(addr, reply)
         self.state.udp_stats.bump("datagrams_valid")
 

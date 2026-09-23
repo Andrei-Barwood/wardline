@@ -17,3 +17,9 @@ El formato sigue Keep a Changelog.
 
 
 
+
+### PROMPT 09 — Validación
+* **Validation module**: Created `src/wardline/security/validation.py` to enforce strict schema constraints.
+* **TCP & UDP Schemas**: Added logic to `validate_tcp` and `validate_udp` leveraging new frozen dataclasses `TcpCommand` and `UdpCommand`.
+* **Protocol parsers**: Refactored `src/wardline/tcp/protocol.py` and `src/wardline/udp/protocol.py` to delegate to validation.
+* **Testing updates**: Created unit tests in `tests/unit/test_validation.py` and `tests/security/test_malformed_input.py`.

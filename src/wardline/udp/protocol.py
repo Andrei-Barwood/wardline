@@ -7,12 +7,13 @@ from typing import Any
 from wardline.contracts import ErrorCode
 from wardline.errors import WardlineError
 from wardline.security.limits import check_message_size
+from wardline.security.validation import UdpCommand, validate_udp
 
 ALLOWED_TYPES = frozenset({"beacon", "ping"})
 _MAX_SEQ = 1_000_000_000
 
 
-def parse_datagram(raw: bytes, *, max_bytes: int) -> dict[str, Any]:
+def parse_datagram(raw: bytes, *, max_bytes: int) -> UdpCommand:
     """Parse one datagram. Oversized input is rejected before JSON decoding."""
     check_message_size(len(raw), max_bytes)
     try:
@@ -25,10 +26,7 @@ def parse_datagram(raw: bytes, *, max_bytes: int) -> dict[str, Any]:
         raise WardlineError(ErrorCode.invalid_message, "invalid message") from caught
     if not isinstance(parsed, dict):
         raise WardlineError(ErrorCode.invalid_message, "invalid message")
-    if parsed.get("type") not in ALLOWED_TYPES:
-        raise WardlineError(ErrorCode.invalid_message, "invalid message")
-    _require_seq(parsed.get("seq"))
-    return parsed
+    return validate_udp(parsed)
 
 
 def encode_small(obj: Mapping[str, Any], *, max_bytes: int = 200) -> bytes:
@@ -37,11 +35,3 @@ def encode_small(obj: Mapping[str, Any], *, max_bytes: int = 200) -> bytes:
     if len(encoded) > max_bytes:
         raise WardlineError(ErrorCode.message_too_large, "message too large")
     return encoded
-
-
-def _require_seq(value: object) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise WardlineError(ErrorCode.invalid_message, "invalid seq")
-    if value < 0 or value > _MAX_SEQ:
-        raise WardlineError(ErrorCode.invalid_message, "invalid seq")
-    return value

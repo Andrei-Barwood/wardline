@@ -14,15 +14,15 @@ from wardline.udp.server import accept_peer
 
 def test_parse_beacon() -> None:
     message = parse_datagram(
-        b'{"type":"beacon","client_id":"training-client","seq":1}',
+        b'{"type":"beacon","client_id":"training-client","token":"secret","seq":1}',
         max_bytes=1024,
     )
-    assert message["type"] == "beacon"
-    assert message["seq"] == 1
+    assert message.type == "beacon"
+    assert message.seq == 1
 
 
 def test_parse_rejects_oversize() -> None:
-    raw = b'{"type":"beacon","seq":1}' + (b" " * 1100)
+    raw = b'{"type":"beacon","token":"secret","seq":1}' + (b" " * 1100)
     with pytest.raises(WardlineError) as caught:
         parse_datagram(raw, max_bytes=1024)
     assert caught.value.code == ErrorCode.message_too_large
@@ -35,8 +35,11 @@ def test_encode_small_refuses_large_object() -> None:
 
 
 def test_seq_must_be_non_negative_int() -> None:
-    parsed = parse_datagram(b'{"type":"beacon","client_id":"a","seq":0}', max_bytes=1024)
-    assert parsed["seq"] == 0
+    parsed = parse_datagram(
+        b'{"type":"beacon","client_id":"a","token":"secret","seq":0}',
+        max_bytes=1024
+    )
+    assert parsed.seq == 0
     for raw in (
         b'{"type":"beacon","client_id":"a","seq":-1}',
         b'{"type":"beacon","client_id":"a","seq":true}',

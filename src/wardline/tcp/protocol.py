@@ -7,11 +7,12 @@ from typing import Any
 from wardline.contracts import ErrorCode
 from wardline.errors import WardlineError
 from wardline.security.limits import check_message_size
+from wardline.security.validation import TcpCommand, validate_tcp
 
 ALLOWED_TYPES = frozenset({"hello", "ping", "echo", "status", "bye"})
 
 
-def parse_line(raw: bytes, *, max_bytes: int) -> dict[str, Any]:
+def parse_line(raw: bytes, *, max_bytes: int) -> TcpCommand:
     """Parse one UTF-8 JSON object. Oversized input is rejected before decoding."""
     check_message_size(len(raw), max_bytes)
     stripped = raw[:-1] if raw.endswith(b"\n") else raw
@@ -27,10 +28,7 @@ def parse_line(raw: bytes, *, max_bytes: int) -> dict[str, Any]:
         raise WardlineError(ErrorCode.invalid_message, "invalid message") from caught
     if not isinstance(parsed, dict):
         raise WardlineError(ErrorCode.invalid_message, "invalid message")
-    message_type = parsed.get("type")
-    if message_type not in ALLOWED_TYPES:
-        raise WardlineError(ErrorCode.invalid_message, "invalid message")
-    return parsed
+    return validate_tcp(parsed)
 
 
 def encode(obj: Mapping[str, Any]) -> bytes:

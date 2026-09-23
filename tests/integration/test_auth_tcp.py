@@ -36,7 +36,7 @@ async def test_tcp_hello_without_token_closes(
         await _send_line(writer, {"type": "hello", "client_id": "training-client"})
         response = await _read_line(reader)
         assert response["type"] == "error"
-        assert response["code"] == "unauthorized"
+        assert response["code"] == "invalid_message"
 
         # Connection closes after unauthorized error
         closed = await asyncio.wait_for(reader.readline(), timeout=1.0)
@@ -108,7 +108,7 @@ async def test_udp_without_token_does_not_ack(
             reply = json.loads(raw_reply)
             # Must NOT be beacon_ack; it returns unauthorized error
             assert reply["type"] == "error"
-            assert reply["code"] == "unauthorized"
+            assert reply["code"] == "invalid_message"
         finally:
             transport.close()
     finally:

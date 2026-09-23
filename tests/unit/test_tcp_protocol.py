@@ -10,8 +10,8 @@ from wardline.tcp.protocol import encode, parse_line
 
 def test_parse_ping() -> None:
     message = parse_line(b'{"type":"ping","request_id":"abc"}\n', max_bytes=4096)
-    assert message["type"] == "ping"
-    assert message["request_id"] == "abc"
+    assert message.type == "ping"
+    assert message.request_id == "abc"
 
 
 def test_parse_rejects_non_object() -> None:

@@ -11,6 +11,7 @@ from wardline.contracts import ErrorCode, Principal, Role, SecurityEvent, Servic
 from wardline.errors import WardlineError
 from wardline.monitoring.stats import TransportStats
 from wardline.runtime import AppState
+from wardline.security.validation import TcpCommand
 from wardline.tcp.protocol import encode, parse_line
 
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -66,7 +67,7 @@ class TcpSession:
                         return
                     continue
                 if not welcomed:
-                    if message.get("type") != "hello":
+                    if message.type != "hello":
                         await self._fail(
                             ErrorCode.invalid_message,
                             "invalid message",
@@ -80,7 +81,7 @@ class TcpSession:
                     if outcome == "ok":
                         welcomed = True
                     continue
-                if message.get("type") == "hello":
+                if message.type == "hello":
                     await self._fail(
                         ErrorCode.invalid_message,
                         "invalid message",
@@ -90,7 +91,7 @@ class TcpSession:
                     return
                 if not self._allow_rate():
                     closing = self._note_error(ErrorCode.rate_limited)
-                    request_id = message.get("request_id")
+                    request_id = message.request_id
                     await self._fail(
                         ErrorCode.rate_limited,
                         "rate limited",
@@ -110,10 +111,10 @@ class TcpSession:
         except (ConnectionError, asyncio.IncompleteReadError):
             return
 
-    async def _hello(self, message: dict[str, Any]) -> str:
+    async def _hello(self, message: "TcpCommand") -> str:
         """Return ok, again, or stop. again keeps the connection waiting for hello."""
         try:
-            client_id = validate_client_id(message.get("client_id"))
+            client_id = validate_client_id(message.client_id)
         except WardlineError as caught:
             await self._fail(caught.code, caught.message, None, closing=True)
             return "stop"
@@ -122,7 +123,7 @@ class TcpSession:
             closing = self._note_error(ErrorCode.rate_limited)
             await self._fail(ErrorCode.rate_limited, "rate limited", None, closing=closing)
             return "stop" if closing else "again"
-        token = message.get("token")
+        token = message.token
         if not isinstance(token, str) or not token:
             self.state.audit.append(
                 SecurityEvent(
@@ -170,9 +171,9 @@ class TcpSession:
         )
         return "ok"
 
-    async def _dispatch(self, message: dict[str, Any]) -> bool:
-        message_type = message.get("type")
-        request_id = message.get("request_id")
+    async def _dispatch(self, message: "TcpCommand") -> bool:
+        message_type = message.type
+        request_id = message.request_id
         if isinstance(message_type, str):
             required_role = TCP_COMMAND_MIN_ROLE.get(message_type, Role.ADMIN)
             actual_role = self.principal.role if self.principal is not None else Role.VIEWER
@@ -203,7 +204,7 @@ class TcpSession:
             if message_type == "ping":
                 payload: dict[str, Any] = {"type": "pong", "request_id": checked}
             elif message_type == "echo":
-                echo_payload = message.get("payload")
+                echo_payload = message.payload
                 if not isinstance(echo_payload, str) or len(echo_payload) > 256:
                     raise WardlineError(ErrorCode.invalid_message, "invalid message")
                 payload = {"type": "echo", "request_id": checked, "payload": echo_payload}
