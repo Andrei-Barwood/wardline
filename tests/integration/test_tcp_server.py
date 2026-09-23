@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 import httpx
 
+from wardline.audit.log import MemoryAuditLog
 from wardline.config.settings import Settings
 from wardline.contracts import ServiceName
 from wardline.runtime import AppState, build_state
@@ -260,3 +261,39 @@ async def test_status_binding_shows_effective_port(
     finally:
         await tcp.stop()
         await http.stop()
+
+
+async def test_tcp_invalid_message_is_audited(
+    settings_factory: Callable[..., Settings],
+) -> None:
+    settings = settings_factory()
+    state = build_state(settings)
+    audit = MemoryAuditLog(clock=state.clock)
+    state.audit = audit
+    running = await start_tcp(state)
+    try:
+        reader, writer = await _open(running.port)
+        await _send(writer, _hello("audit-client"))
+        welcome = await _read(reader)
+        assert welcome["type"] == "welcome"
+
+        writer.write(b"not-json\n")
+        await writer.drain()
+
+        err = await _read(reader)
+        assert err["type"] == "error"
+        assert err["code"] == "invalid_message"
+
+        writer.close()
+        await writer.wait_closed()
+
+        events = [e for e in audit.events if e.event_type == "invalid_message"]
+        assert len(events) >= 1
+        assert events[0].source == "audit-client"
+        assert events[0].service == ServiceName.TCP
+
+        for ev in audit.events:
+            assert "dev-admin-key" not in ev.model_dump_json()
+    finally:
+        await running.stop()
+

@@ -11,3 +11,5 @@ El formato sigue Keep a Changelog.
 - API HTTP local con /health, /version y /status.
 - Servicio TCP local con protocolo de líneas JSON y límites de sesión.
 - Servicio UDP local sin amplificación: los datagramas grandes no reciben respuesta.
+- Logging estructurado en formato JSON y registro de auditoría append-only con redacción y coalescencia.
+

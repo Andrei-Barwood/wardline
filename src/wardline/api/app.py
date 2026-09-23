@@ -22,7 +22,7 @@ from wardline.api.routes.health import router as health_router
 from wardline.api.routes.status import router as status_router
 from wardline.api.routes.version import router as version_router
 from wardline.config.settings import load_settings
-from wardline.contracts import ErrorCode
+from wardline.contracts import ErrorCode, SecurityEvent, ServiceName, Severity
 from wardline.errors import WardlineError
 from wardline.logsetup import get_logger
 from wardline.runtime import AppState, build_state
@@ -48,6 +48,18 @@ class RequestContextMiddleware:
         method = str(scope.get("method", ""))
         path = str(scope.get("path", "")).split("?", 1)[0]
         if too_large:
+            self.lab.audit.append(
+                SecurityEvent(
+                    timestamp=self.lab.clock.now(),
+                    source="http",
+                    service=ServiceName.HTTP,
+                    event_type=ErrorCode.message_too_large.value,
+                    severity=Severity.LOW,
+                    simulation=False,
+                    action="rejected",
+                    correlation_id=correlation_id,
+                )
+            )
             await _send_json(
                 send,
                 status_code=413,
@@ -123,6 +135,29 @@ def _install_handlers(app: FastAPI) -> None:
     @app.exception_handler(WardlineError)
     async def handle_domain(request: Any, exc: WardlineError) -> JSONResponse:
         correlation_id = correlation_id_from(request)
+        audited = {
+            ErrorCode.unauthorized,
+            ErrorCode.forbidden,
+            ErrorCode.rate_limited,
+            ErrorCode.message_too_large,
+            ErrorCode.invalid_message,
+            ErrorCode.client_blocked,
+            ErrorCode.circuit_open,
+            ErrorCode.timeout,
+        }
+        if exc.code in audited:
+            app.state.lab.audit.append(
+                SecurityEvent(
+                    timestamp=app.state.lab.clock.now(),
+                    source="http",
+                    service=ServiceName.HTTP,
+                    event_type=exc.code.value,
+                    severity=Severity.LOW,
+                    simulation=False,
+                    action="rejected",
+                    correlation_id=correlation_id,
+                )
+            )
         return JSONResponse(
             status_code=status_for(exc.code),
             content=wardline_error_payload(exc, correlation_id),

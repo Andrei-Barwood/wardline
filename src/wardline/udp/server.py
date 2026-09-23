@@ -86,30 +86,33 @@ class UdpServer:
         if len(data) > self.state.settings.udp_max_datagram_bytes:
             # Oversized datagrams are dropped with no reply, which avoids amplification.
             self.state.udp_stats.bump("datagrams_dropped")
+            self._audit(ErrorCode.message_too_large, host)
             return
         if not self.state.circuit_breakers.allow(ServiceName.UDP):
             self.state.udp_stats.bump("datagrams_dropped")
+            self._audit(ErrorCode.circuit_open, host)
             return
         try:
             message = parse_datagram(data, max_bytes=self.state.settings.udp_max_datagram_bytes)
             client_id = validate_client_id(message.get("client_id"))
         except WardlineError as caught:
+            self._audit(caught.code, host)
             self._reply_error(addr, caught.code, caught.message)
             return
         if not self.state.rate_limiter.allow(f"udp:{client_id}"):
             self.state.udp_stats.bump("datagrams_dropped")
-            self.state.events.add(
-                SecurityEvent(
-                    timestamp=self.state.clock.now(),
-                    source=client_id,
-                    service=ServiceName.UDP,
-                    event_type="security_rate_limited",
-                    severity=Severity.LOW,
-                    simulation=False,
-                    action="dropped",
-                    correlation_id=str(uuid.uuid4()),
-                )
+            rate_event = SecurityEvent(
+                timestamp=self.state.clock.now(),
+                source=client_id,
+                service=ServiceName.UDP,
+                event_type="security_rate_limited",
+                severity=Severity.LOW,
+                simulation=False,
+                action="dropped",
+                correlation_id=str(uuid.uuid4()),
             )
+            self.state.events.add(rate_event)
+            self.state.audit.append(rate_event)
             return
         self._note_seq(client_id, int(message["seq"]))
         token = message.get("token")
@@ -125,11 +128,26 @@ class UdpServer:
         else:
             request_id = message.get("request_id")
             if not isinstance(request_id, str) or not request_id:
+                self._audit(ErrorCode.invalid_message, client_id)
                 self._reply_error(addr, ErrorCode.invalid_message, "invalid message")
                 return
             reply = {"type": "pong", "request_id": request_id, "seq": message["seq"]}
         self._send(addr, reply)
         self.state.udp_stats.bump("datagrams_valid")
+
+    def _audit(self, code: ErrorCode, source: str) -> None:
+        self.state.audit.append(
+            SecurityEvent(
+                timestamp=self.state.clock.now(),
+                source=source,
+                service=ServiceName.UDP,
+                event_type=code.value,
+                severity=Severity.LOW,
+                simulation=False,
+                action="dropped",
+                correlation_id=str(uuid.uuid4()),
+            )
+        )
 
     def _note_seq(self, client_id: str, seq: int) -> None:
         previous = self._last_seq.get(client_id)

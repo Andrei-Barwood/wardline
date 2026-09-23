@@ -56,6 +56,13 @@ class _Coalescer:
         self._dropped += 1
         return False
 
+    def flush(self, now: datetime) -> SecurityEvent | None:
+        summary = self._summary(now)
+        self._window_started = now
+        self._count = 0
+        self._dropped = 0
+        return summary
+
     def _summary(self, now: datetime) -> SecurityEvent | None:
         if self._dropped <= 0:
             return None
@@ -100,6 +107,12 @@ class MemoryAuditLog:
         if self._coalescer.keep_original():
             self.events.append(_redact_event(event, self._secrets))
 
+    def flush(self) -> None:
+        now = self._clock.now()
+        summary = self._coalescer.flush(now)
+        if summary is not None:
+            self.events.append(summary)
+
 
 class FileAuditLog:
     """JSONL audit file under the laboratory data directory."""
@@ -129,6 +142,12 @@ class FileAuditLog:
             self._write(summary)
         if self._coalescer.keep_original():
             self._write(_redact_event(event, self._secrets))
+
+    def flush(self) -> None:
+        now = self._clock.now()
+        summary = self._coalescer.flush(now)
+        if summary is not None:
+            self._write(summary)
 
     def _write(self, event: SecurityEvent) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

@@ -50,9 +50,10 @@ class _ServiceAdapter(logging.LoggerAdapter[logging.Logger]):
 
     def process(self, msg: str, kwargs: Any) -> tuple[str, Any]:
         extra = dict(kwargs.get("extra") or {})
-        extra.setdefault("service", self.extra.get("service", "system"))
-        extra.setdefault("correlation_id", self.extra.get("correlation_id", ""))
-        extra.setdefault("simulation", self.extra.get("simulation", False))
+        default_extra = self.extra or {}
+        extra.setdefault("service", default_extra.get("service", "system"))
+        extra.setdefault("correlation_id", default_extra.get("correlation_id", ""))
+        extra.setdefault("simulation", default_extra.get("simulation", False))
         kwargs["extra"] = extra
         return msg, kwargs
 
@@ -75,13 +76,19 @@ def configure_logging(
     """
     logger = logging.getLogger("wardline")
     if replace:
-        logger.handlers = [handler for handler in logger.handlers if not getattr(handler, _HANDLER_MARK, False)]
+        logger.handlers = [
+            handler for handler in logger.handlers if not getattr(handler, _HANDLER_MARK, False)
+        ]
     elif any(getattr(handler, _HANDLER_MARK, False) for handler in logger.handlers):
         return
     secrets = tuple(parse_dev_api_keys(settings.dev_api_keys).values())
     handler = logging.StreamHandler(stream if stream is not None else sys.stderr)
     setattr(handler, _HANDLER_MARK, True)
-    handler.setFormatter(_RedactingFormatter(secrets=secrets, as_json=settings.log_format != "text"))
+    formatter = _RedactingFormatter(
+        secrets=secrets,
+        as_json=settings.log_format != "text",
+    )
+    handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(settings.log_level)
     logger.propagate = False
