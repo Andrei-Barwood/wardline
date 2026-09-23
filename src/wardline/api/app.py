@@ -5,13 +5,14 @@ import uuid
 from collections.abc import Awaitable, Callable, MutableMapping
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.datastructures import MutableHeaders
 from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from wardline.api.deps import require_role
 from wardline.api.errors import (
     correlation_id_from,
     error_payload,
@@ -22,7 +23,7 @@ from wardline.api.routes.health import router as health_router
 from wardline.api.routes.status import router as status_router
 from wardline.api.routes.version import router as version_router
 from wardline.config.settings import load_settings
-from wardline.contracts import ErrorCode, SecurityEvent, ServiceName, Severity
+from wardline.contracts import ErrorCode, Role, SecurityEvent, ServiceName, Severity
 from wardline.errors import WardlineError
 from wardline.logsetup import get_logger
 from wardline.runtime import AppState, build_state
@@ -100,9 +101,16 @@ def create_app(state: AppState | None = None) -> FastAPI:
     )
     app.state.lab = lab
     app.add_middleware(RequestContextMiddleware, lab=lab)
-    app.include_router(health_router)
-    app.include_router(version_router)
-    app.include_router(status_router)
+
+    public_router = APIRouter()
+    public_router.include_router(health_router)
+    public_router.include_router(version_router)
+
+    authed_router = APIRouter(dependencies=[Depends(require_role(Role.VIEWER))])
+    authed_router.include_router(status_router)
+
+    app.include_router(public_router)
+    app.include_router(authed_router)
     _install_handlers(app)
     return app
 

@@ -5,6 +5,7 @@ import re
 import uuid
 from typing import Any
 
+from wardline.auth.policy import TCP_COMMAND_MIN_ROLE, role_allows
 from wardline.clients.identity import validate_client_id
 from wardline.contracts import ErrorCode, Principal, Role, SecurityEvent, ServiceName, Severity
 from wardline.errors import WardlineError
@@ -172,6 +173,27 @@ class TcpSession:
     async def _dispatch(self, message: dict[str, Any]) -> bool:
         message_type = message.get("type")
         request_id = message.get("request_id")
+        if isinstance(message_type, str):
+            required_role = TCP_COMMAND_MIN_ROLE.get(message_type, Role.ADMIN)
+            actual_role = self.principal.role if self.principal is not None else Role.VIEWER
+            if not role_allows(actual_role, required_role):
+                self.state.audit.append(
+                    SecurityEvent(
+                        timestamp=self.state.clock.now(),
+                        source=self.client_id or "unknown",
+                        service=ServiceName.AUTH,
+                        event_type="security_authz_denied",
+                        severity=Severity.LOW,
+                        simulation=False,
+                        action="denied",
+                        correlation_id=self.session_id,
+                        details={"required": required_role.value},
+                    )
+                )
+                closing = self._note_error(ErrorCode.forbidden)
+                visible_id = request_id if isinstance(request_id, str) else None
+                await self._fail(ErrorCode.forbidden, "forbidden", visible_id, closing=closing)
+                return not closing
         try:
             if message_type == "bye":
                 self.stats.bump("messages_valid")
@@ -215,7 +237,6 @@ class TcpSession:
             ErrorCode.rate_limited,
             ErrorCode.circuit_open,
             ErrorCode.client_blocked,
-            ErrorCode.forbidden,
             ErrorCode.connection_limit,
         }
         if code not in audited:

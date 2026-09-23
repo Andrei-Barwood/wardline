@@ -13,5 +13,7 @@ El formato sigue Keep a Changelog.
 - Servicio UDP local sin amplificación: los datagramas grandes no reciben respuesta.
 - Logging estructurado en formato JSON y registro de auditoría append-only con redacción y coalescencia.
 - Autenticación mediante claves de API de laboratorio con comparación en tiempo constante y protección de /status, TCP y UDP.
+- Jerarquía de roles (viewer, operator, admin) y autorización con fallo cerrado para rutas HTTP y comandos TCP.
+
 
 

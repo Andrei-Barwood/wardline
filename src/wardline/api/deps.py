@@ -1,12 +1,14 @@
 """FastAPI dependencies for the administration API."""
 
+from collections.abc import Callable
 from typing import Annotated, NoReturn
 
 from fastapi import Depends
 from starlette.requests import Request
 
+from wardline.auth.policy import role_allows
 from wardline.clients.identity import validate_client_id
-from wardline.contracts import ErrorCode, Principal, SecurityEvent, ServiceName, Severity
+from wardline.contracts import ErrorCode, Principal, Role, SecurityEvent, ServiceName, Severity
 from wardline.errors import WardlineError
 from wardline.runtime import AppState
 
@@ -28,6 +30,7 @@ def require_principal(request: Request) -> Principal:
     correlation_id = getattr(request.state, "correlation_id", "unavailable")
 
     def _fail_auth(reason: str, source: str = "unknown") -> NoReturn:
+        lab.metrics.bump("http", "unauthorized_total")
         lab.audit.append(
             SecurityEvent(
                 timestamp=lab.clock.now(),
@@ -87,3 +90,36 @@ def require_principal(request: Request) -> Principal:
 
 
 PrincipalDep = Annotated[Principal, Depends(require_principal)]
+
+
+def require_role(*allowed: Role) -> Callable[..., Principal]:
+    """Return a dependency requiring that the principal has one of the allowed roles."""
+
+    def dependency(
+        request: Request,
+        principal: PrincipalDep,
+    ) -> Principal:
+        lab = get_state(request)
+        correlation_id = getattr(request.state, "correlation_id", "unavailable")
+        if not any(role_allows(principal.role, req) for req in allowed):
+            lab.metrics.bump("http", "forbidden_total")
+            required_name = (
+                allowed[0].value if len(allowed) == 1 else ",".join(r.value for r in allowed)
+            )
+            lab.audit.append(
+                SecurityEvent(
+                    timestamp=lab.clock.now(),
+                    source=principal.client_id,
+                    service=ServiceName.AUTH,
+                    event_type="security_authz_denied",
+                    severity=Severity.LOW,
+                    simulation=False,
+                    action="denied",
+                    correlation_id=correlation_id,
+                    details={"required": required_name},
+                )
+            )
+            raise WardlineError(ErrorCode.forbidden, "forbidden")
+        return principal
+
+    return dependency
