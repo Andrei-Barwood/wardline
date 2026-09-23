@@ -20,6 +20,7 @@ from wardline.api.errors import (
     wardline_error_payload,
 )
 from wardline.api.routes.health import router as health_router
+from wardline.api.routes.simulation import router as simulation_router
 from wardline.api.routes.status import router as status_router
 from wardline.api.routes.version import router as version_router
 from wardline.config.settings import load_settings
@@ -117,6 +118,7 @@ def create_app(state: AppState | None = None) -> FastAPI:
         ]
     )
     authed_router.include_router(status_router)
+    authed_router.include_router(simulation_router)
 
     app.include_router(public_router)
     app.include_router(authed_router)
