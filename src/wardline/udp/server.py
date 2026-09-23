@@ -10,7 +10,7 @@ from collections import OrderedDict
 from typing import Any
 
 from wardline.clients.identity import validate_client_id
-from wardline.contracts import ErrorCode, Role, SecurityEvent, ServiceName, Severity
+from wardline.contracts import ErrorCode, SecurityEvent, ServiceName, Severity
 from wardline.errors import WardlineError
 from wardline.runtime import AppState
 from wardline.udp.protocol import encode_small, parse_datagram
@@ -116,8 +116,16 @@ class UdpServer:
             return
         self._note_seq(client_id, int(message["seq"]))
         token = message.get("token")
-        principal = self.state.auth.authenticate(token if isinstance(token, str) else None)
-        role = principal.role if principal is not None else Role.VIEWER
+        if not isinstance(token, str) or not token:
+            self._audit_auth_failure(client_id, "missing")
+            self._reply_error(addr, ErrorCode.unauthorized, "unauthorized")
+            return
+        principal = self.state.auth.authenticate_request(token, client_id=client_id)
+        if principal is None or not principal.authenticated:
+            self._audit_auth_failure(client_id, "mismatch")
+            self._reply_error(addr, ErrorCode.unauthorized, "unauthorized")
+            return
+        role = principal.role
         if message["type"] == "beacon":
             reply: dict[str, Any] = {
                 "type": "beacon_ack",
@@ -146,6 +154,21 @@ class UdpServer:
                 simulation=False,
                 action="dropped",
                 correlation_id=str(uuid.uuid4()),
+            )
+        )
+
+    def _audit_auth_failure(self, source: str, reason: str) -> None:
+        self.state.audit.append(
+            SecurityEvent(
+                timestamp=self.state.clock.now(),
+                source=source,
+                service=ServiceName.AUTH,
+                event_type="security_auth_failure",
+                severity=Severity.LOW,
+                simulation=False,
+                action="rejected",
+                correlation_id=str(uuid.uuid4()),
+                details={"reason": reason},
             )
         )
 

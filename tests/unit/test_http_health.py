@@ -7,6 +7,7 @@ import httpx
 from wardline import __version__
 from wardline.api.app import create_app
 from wardline.config.settings import Settings
+from wardline.contracts import Role
 from wardline.runtime import build_state
 
 
@@ -28,8 +29,11 @@ async def test_version_matches_package(api_client: httpx.AsyncClient) -> None:
     assert response.json() == {"name": "wardline", "version": __version__}
 
 
-async def test_status_shape_hides_secrets(api_client: httpx.AsyncClient) -> None:
-    response = await api_client.get("/status")
+async def test_status_shape_hides_secrets(
+    api_client: httpx.AsyncClient,
+    auth_header: Callable[[Role | str], dict[str, str]],
+) -> None:
+    response = await api_client.get("/status", headers=auth_header("viewer"))
     assert response.status_code == 200
     body = response.json()
     assert set(body) == {"app", "version", "environment", "started_at", "components", "bindings"}

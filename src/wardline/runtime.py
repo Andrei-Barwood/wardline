@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from wardline.audit.log import AuditLog, NullAuditLog
-from wardline.auth.provider import AllowAllAuth, AuthProvider
+from wardline.auth.provider import ApiKeyAuthProvider, AuthProvider
 from wardline.clients.blocks import BlockRegistry, InMemoryBlockRegistry
 from wardline.config.settings import Settings, validate_settings
 from wardline.contracts import Clock, SystemClock
@@ -61,7 +61,7 @@ def build_state(settings: Settings, *, clock: Clock | None = None) -> AppState:
         settings=settings,
         started_at=started_at,
         clock=active_clock,
-        auth=AllowAllAuth(),
+        auth=ApiKeyAuthProvider(settings.dev_api_keys),
         events=MemoryEventRepository(),
         incidents=MemoryIncidentRepository(),
         metrics=MetricsRegistry(

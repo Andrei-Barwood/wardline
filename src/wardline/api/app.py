@@ -136,7 +136,6 @@ def _install_handlers(app: FastAPI) -> None:
     async def handle_domain(request: Any, exc: WardlineError) -> JSONResponse:
         correlation_id = correlation_id_from(request)
         audited = {
-            ErrorCode.unauthorized,
             ErrorCode.forbidden,
             ErrorCode.rate_limited,
             ErrorCode.message_too_large,
@@ -158,9 +157,13 @@ def _install_handlers(app: FastAPI) -> None:
                     correlation_id=correlation_id,
                 )
             )
+        headers: dict[str, str] = {}
+        if exc.code == ErrorCode.unauthorized:
+            headers["WWW-Authenticate"] = 'Bearer realm="wardline"'
         return JSONResponse(
             status_code=status_for(exc.code),
             content=wardline_error_payload(exc, correlation_id),
+            headers=headers,
         )
 
     @app.exception_handler(HTTPException)

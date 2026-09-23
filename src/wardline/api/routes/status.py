@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 from wardline import __version__
-from wardline.api.deps import LabState
+from wardline.api.deps import LabState, PrincipalDep
 
 router = APIRouter()
 
@@ -11,8 +11,9 @@ _COMPONENTS = ("http", "tcp", "udp", "database")
 
 
 @router.get("/status")
-def read_status(state: LabState) -> dict[str, object]:
+def read_status(state: LabState, principal: PrincipalDep) -> dict[str, object]:
     """Return process status. Bindings and components only; never keys."""
+    del principal
     snapshot = state.health.snapshot()
     return {
         "app": state.settings.app_name,

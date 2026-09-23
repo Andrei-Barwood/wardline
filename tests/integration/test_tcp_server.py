@@ -46,8 +46,11 @@ async def _read(reader: asyncio.StreamReader, timeout: float = 1.0) -> dict[str,
     return parsed
 
 
-def _hello(client_id: str = "training-client") -> dict[str, object]:
-    return {"type": "hello", "client_id": client_id}
+def _hello(
+    client_id: str = "training-client",
+    token: str = "dev-viewer-key",
+) -> dict[str, object]:
+    return {"type": "hello", "client_id": client_id, "token": token}
 
 
 async def _started(settings: Settings) -> tuple[AppState, RunningServer]:
@@ -253,7 +256,10 @@ async def test_status_binding_shows_effective_port(
     tcp = await start_tcp(state)
     try:
         async with httpx.AsyncClient(base_url=f"http://127.0.0.1:{http.port}", timeout=2) as client:
-            response = await client.get("/status")
+            response = await client.get(
+                "/status",
+                headers={"Authorization": "Bearer dev-viewer-key"},
+            )
         body = response.json()
         assert body["bindings"]["tcp"] == f"127.0.0.1:{tcp.port}"
         assert body["bindings"]["http"] == f"127.0.0.1:{http.port}"

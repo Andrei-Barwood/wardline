@@ -52,6 +52,24 @@ def auth_header() -> Callable[[Role | str], dict[str, str]]:
 
 
 @pytest.fixture
+def tcp_hello() -> Callable[..., dict[str, object]]:
+    """Return a hello payload with the fictional laboratory token for the given role."""
+
+    def factory(
+        client_id: str = "training-client", role: Role | str = Role.VIEWER
+    ) -> dict[str, object]:
+        selected = Role(role)
+        return {
+            "type": "hello",
+            "client_id": client_id,
+            "token": _FAKE_KEYS[selected],
+        }
+
+    return factory
+
+
+
+@pytest.fixture
 async def api_client(
     settings_factory: Callable[..., Settings],
 ) -> AsyncIterator[httpx.AsyncClient]:

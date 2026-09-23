@@ -47,9 +47,9 @@ async def _started(settings: Settings) -> tuple[AppState, RunningServer]:
     return state, running
 
 
-def _beacon(seq: int = 1) -> bytes:
+def _beacon(seq: int = 1, token: str = "dev-viewer-key") -> bytes:
     return json.dumps(
-        {"type": "beacon", "client_id": "training-client", "seq": seq},
+        {"type": "beacon", "client_id": "training-client", "seq": seq, "token": token},
         separators=(",", ":"),
     ).encode("utf-8")
 
@@ -81,7 +81,13 @@ async def test_udp_ping(settings_factory: Callable[..., Settings]) -> None:
     _state, running = await _started(settings_factory())
     try:
         payload = json.dumps(
-            {"type": "ping", "client_id": "training-client", "seq": 2, "request_id": "u1"},
+            {
+                "type": "ping",
+                "client_id": "training-client",
+                "seq": 2,
+                "request_id": "u1",
+                "token": "dev-viewer-key",
+            },
             separators=(",", ":"),
         ).encode("utf-8")
         body = json.loads(await _roundtrip(running.port, payload))

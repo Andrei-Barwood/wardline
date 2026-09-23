@@ -122,15 +122,48 @@ class TcpSession:
             await self._fail(ErrorCode.rate_limited, "rate limited", None, closing=closing)
             return "stop" if closing else "again"
         token = message.get("token")
-        authenticated = self.state.auth.authenticate(token if isinstance(token, str) else None)
-        role = authenticated.role if authenticated is not None else Role.VIEWER
-        self.principal = Principal(client_id=client_id, role=role, authenticated=False)
+        if not isinstance(token, str) or not token:
+            self.state.audit.append(
+                SecurityEvent(
+                    timestamp=self.state.clock.now(),
+                    source=client_id,
+                    service=ServiceName.AUTH,
+                    event_type="security_auth_failure",
+                    severity=Severity.LOW,
+                    simulation=False,
+                    action="rejected",
+                    correlation_id=self.session_id,
+                    details={"reason": "missing"},
+                )
+            )
+            await self._fail(ErrorCode.unauthorized, "unauthorized", None, closing=True)
+            return "stop"
+
+        principal = self.state.auth.authenticate_request(token, client_id=client_id)
+        if principal is None or not principal.authenticated:
+            self.state.audit.append(
+                SecurityEvent(
+                    timestamp=self.state.clock.now(),
+                    source=client_id,
+                    service=ServiceName.AUTH,
+                    event_type="security_auth_failure",
+                    severity=Severity.LOW,
+                    simulation=False,
+                    action="rejected",
+                    correlation_id=self.session_id,
+                    details={"reason": "mismatch"},
+                )
+            )
+            await self._fail(ErrorCode.unauthorized, "unauthorized", None, closing=True)
+            return "stop"
+
+        self.principal = principal
         self.stats.bump("messages_valid")
         await self._send(
             {
                 "type": "welcome",
                 "client_id": client_id,
-                "role": role.value,
+                "role": principal.role.value,
                 "session_id": self.session_id,
             }
         )
@@ -182,7 +215,6 @@ class TcpSession:
             ErrorCode.rate_limited,
             ErrorCode.circuit_open,
             ErrorCode.client_blocked,
-            ErrorCode.unauthorized,
             ErrorCode.forbidden,
             ErrorCode.connection_limit,
         }

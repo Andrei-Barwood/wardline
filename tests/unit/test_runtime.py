@@ -57,8 +57,8 @@ def test_validate_settings_accepts_loopback() -> None:
 
 def test_null_components_do_not_raise() -> None:
     state = build_state(Settings())
-    assert state.auth.authenticate(None) is not None
-    assert state.auth.authenticate("not-a-key") is not None
+    assert state.auth.authenticate(None) is None
+    assert state.auth.authenticate("not-a-key") is None
     event = _event()
     state.events.add(event)
     assert state.events.list_events() == [event]
