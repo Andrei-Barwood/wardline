@@ -24,6 +24,7 @@ from wardline.api.routes.version import router as version_router
 from wardline.config.settings import load_settings
 from wardline.contracts import ErrorCode
 from wardline.errors import WardlineError
+from wardline.logsetup import get_logger
 from wardline.runtime import AppState, build_state
 
 
@@ -44,6 +45,8 @@ class RequestContextMiddleware:
             state["correlation_id"] = correlation_id
         self.lab.metrics.bump("http", "requests_total")
         too_large = _content_length_too_large(scope, self.lab.settings.http_max_body_bytes)
+        method = str(scope.get("method", ""))
+        path = str(scope.get("path", "")).split("?", 1)[0]
         if too_large:
             await _send_json(
                 send,
@@ -55,15 +58,21 @@ class RequestContextMiddleware:
                 ),
                 correlation_id=correlation_id,
             )
+            _log_http(method, path, 413, correlation_id)
             return
 
+        status_code = 500
+
         async def send_with_correlation(message: MutableMapping[str, Any]) -> None:
+            nonlocal status_code
             if message["type"] == "http.response.start":
+                status_code = int(message["status"])
                 headers = MutableHeaders(scope=message)
                 headers["X-Correlation-ID"] = correlation_id
             await send(message)
 
         await self.app(scope, receive, send_with_correlation)
+        _log_http(method, path, status_code, correlation_id)
 
 
 def create_app(state: AppState | None = None) -> FastAPI:
@@ -84,6 +93,20 @@ def create_app(state: AppState | None = None) -> FastAPI:
     app.include_router(status_router)
     _install_handlers(app)
     return app
+
+
+def _log_http(method: str, path: str, status_code: int, correlation_id: str) -> None:
+    get_logger("wardline.http").info(
+        "request completed",
+        extra={
+            "service": "http",
+            "correlation_id": correlation_id,
+            "status_code": status_code,
+            "method": method,
+            "path": path,
+            "simulation": False,
+        },
+    )
 
 
 def _mark_local_health(state: AppState) -> None:

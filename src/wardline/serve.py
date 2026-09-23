@@ -1,4 +1,4 @@
-"""Start and stop the local HTTP server. TCP and UDP arrive in later prompts."""
+"""Start and stop the local HTTP, TCP, and UDP servers."""
 
 import asyncio
 from dataclasses import dataclass
@@ -7,20 +7,26 @@ import uvicorn
 
 from wardline.api.app import create_app
 from wardline.runtime import AppState
+from wardline.tcp.server import TcpServer
+from wardline.udp.server import UdpServer
 
 
 @dataclass
 class RunningServer:
     """A server that is already accepting connections on loopback."""
 
-    server: uvicorn.Server
+    server: uvicorn.Server | TcpServer | UdpServer
     port: int
-    task: asyncio.Task[None]
+    task: asyncio.Task[None] | None = None
 
     async def stop(self) -> None:
-        """Ask the server to leave its loop and wait until the socket is closed."""
+        """Stop listening and close accepted sessions."""
+        if isinstance(self.server, (TcpServer, UdpServer)):
+            await self.server.stop()
+            return
         self.server.should_exit = True
-        await asyncio.wait_for(self.task, timeout=5)
+        if self.task is not None:
+            await asyncio.wait_for(self.task, timeout=5)
 
 
 async def start_http(state: AppState) -> RunningServer:
@@ -63,3 +69,17 @@ async def _wait_until_started(server: uvicorn.Server, task: asyncio.Task[None]) 
             raise RuntimeError("http server stopped before accepting connections")
         await asyncio.sleep(0.02)
     raise RuntimeError("http server did not start")
+
+
+async def start_tcp(state: AppState) -> RunningServer:
+    """Bind the TCP line protocol to the configured loopback host."""
+    server = TcpServer(state)
+    await server.start()
+    return RunningServer(server=server, port=server.port)
+
+
+async def start_udp(state: AppState) -> RunningServer:
+    """Bind the UDP datagram protocol to the configured loopback host."""
+    server = UdpServer(state)
+    await server.start()
+    return RunningServer(server=server, port=server.port)

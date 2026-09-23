@@ -11,6 +11,7 @@ from wardline.runtime import build_state
 
 
 async def test_health_degraded_when_tcp_down(api_client: httpx.AsyncClient) -> None:
+    """TCP is still down when only the HTTP app is built, so health stays degraded."""
     response = await api_client.get("/health")
     assert response.status_code == 503
     body = response.json()
