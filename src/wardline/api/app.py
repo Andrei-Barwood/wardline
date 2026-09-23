@@ -102,13 +102,19 @@ def create_app(state: AppState | None = None) -> FastAPI:
     app.state.lab = lab
     app.add_middleware(RequestContextMiddleware, lab=lab)
 
-    from wardline.api.deps import check_rate_limit
+    from wardline.api.deps import check_circuit, check_quota, check_rate_limit
+
     public_router = APIRouter(dependencies=[Depends(check_rate_limit)])
     public_router.include_router(health_router)
     public_router.include_router(version_router)
 
     authed_router = APIRouter(
-        dependencies=[Depends(require_role(Role.VIEWER)), Depends(check_rate_limit)]
+        dependencies=[
+            Depends(check_circuit),
+            Depends(require_role(Role.VIEWER)),
+            Depends(check_rate_limit),
+            Depends(check_quota),
+        ]
     )
     authed_router.include_router(status_router)
 
@@ -153,6 +159,7 @@ def _install_handlers(app: FastAPI) -> None:
             ErrorCode.invalid_message,
             ErrorCode.client_blocked,
             ErrorCode.circuit_open,
+            ErrorCode.quota_exceeded,
             ErrorCode.timeout,
         }
         if exc.code in audited:

@@ -54,10 +54,6 @@ class TcpSession:
                 if raw is None:
                     return
                 self.stats.bump("bytes_in", len(raw))
-                if not self.state.circuit_breakers.allow(ServiceName.TCP):
-                    self.stats.bump("messages_invalid")
-                    await self._fail(ErrorCode.circuit_open, "circuit open", None, closing=True)
-                    return
                 try:
                     message = parse_line(raw, max_bytes=self.state.settings.tcp_max_message_bytes)
                 except WardlineError as caught:
@@ -89,6 +85,18 @@ class TcpSession:
                         closing=True,
                     )
                     return
+                if not self.state.circuit_breakers.allow(ServiceName.TCP):
+                    closing = self._note_error(ErrorCode.circuit_open)
+                    request_id = message.request_id
+                    await self._fail(
+                        ErrorCode.circuit_open,
+                        "circuit open",
+                        request_id if isinstance(request_id, str) else None,
+                        closing=closing,
+                    )
+                    if closing:
+                        return
+                    continue
                 if not self._allow_rate():
                     closing = self._note_error(ErrorCode.rate_limited)
                     request_id = message.request_id
@@ -101,12 +109,39 @@ class TcpSession:
                     if closing:
                         return
                     continue
+                assert self.client_id is not None
+                if not self.state.quotas.allow(self.client_id):
+                    closing = self._note_error(ErrorCode.quota_exceeded)
+                    request_id = message.request_id
+                    await self._fail(
+                        ErrorCode.quota_exceeded,
+                        "quota exceeded",
+                        request_id if isinstance(request_id, str) else None,
+                        closing=closing,
+                    )
+                    if closing:
+                        return
+                    continue
                 if not await self._dispatch(message):
                     return
+                from wardline.security.circuit_breaker import note_success
+
+                note_success(self.state, ServiceName.TCP)
         except WardlineError as caught:
             self.stats.bump("messages_invalid")
             if caught.code == ErrorCode.timeout:
                 self.stats.bump("timeouts")
+            if caught.code in {
+                ErrorCode.invalid_message,
+                ErrorCode.message_too_large,
+                ErrorCode.timeout,
+                ErrorCode.rate_limited,
+                ErrorCode.quota_exceeded,
+                ErrorCode.connection_limit,
+            }:
+                from wardline.security.circuit_breaker import note_failure
+
+                note_failure(self.state, ServiceName.TCP)
             await self._fail(caught.code, caught.message, None, closing=True)
         except (ConnectionError, asyncio.IncompleteReadError):
             return
@@ -118,14 +153,9 @@ class TcpSession:
         except WardlineError as caught:
             await self._fail(caught.code, caught.message, None, closing=True)
             return "stop"
-            
+
         ip = self.writer.get_extra_info("peername")[0]
-        
-        if not self.state.rate_limiter.allow(f"tcp:{client_id}"):
-            closing = self._note_error(ErrorCode.rate_limited)
-            await self._fail(ErrorCode.rate_limited, "rate limited", None, closing=closing)
-            return "stop" if closing else "again"
-            
+
         token = message.token
         if not isinstance(token, str) or not token:
             self.state.rate_limiter.allow(f"tcp-unauth:{ip}")
@@ -164,6 +194,21 @@ class TcpSession:
             await self._fail(ErrorCode.unauthorized, "unauthorized", None, closing=True)
             return "stop"
 
+        if not self.state.circuit_breakers.allow(ServiceName.TCP):
+            closing = self._note_error(ErrorCode.circuit_open)
+            await self._fail(ErrorCode.circuit_open, "circuit open", None, closing=closing)
+            return "stop" if closing else "again"
+
+        if not self.state.rate_limiter.allow(f"tcp:{client_id}"):
+            closing = self._note_error(ErrorCode.rate_limited)
+            await self._fail(ErrorCode.rate_limited, "rate limited", None, closing=closing)
+            return "stop" if closing else "again"
+
+        if not self.state.quotas.allow(client_id):
+            closing = self._note_error(ErrorCode.quota_exceeded)
+            await self._fail(ErrorCode.quota_exceeded, "quota exceeded", None, closing=closing)
+            return "stop" if closing else "again"
+
         self.client_id = client_id
         self.principal = principal
         self.stats.bump("messages_valid")
@@ -175,7 +220,10 @@ class TcpSession:
                 "session_id": self.session_id,
             }
         )
-        return "ok" 
+        from wardline.security.circuit_breaker import note_success
+
+        note_success(self.state, ServiceName.TCP)
+        return "ok"
 
     async def _dispatch(self, message: "TcpCommand") -> bool:
         message_type = message.type
@@ -246,17 +294,20 @@ class TcpSession:
             ErrorCode.client_blocked,
             ErrorCode.connection_limit,
         }
-        if code not in audited:
+        if code not in audited and code != ErrorCode.quota_exceeded:
             return
+        severity = Severity.MEDIUM if code == ErrorCode.quota_exceeded else Severity.LOW
+        action = "rejected" if code == ErrorCode.quota_exceeded else "recorded"
+        event_type = "security_quota_exceeded" if code == ErrorCode.quota_exceeded else code.value
         self.state.audit.append(
             SecurityEvent(
                 timestamp=self.state.clock.now(),
                 source=self.client_id or "unknown",
                 service=ServiceName.TCP,
-                event_type=code.value,
-                severity=Severity.LOW,
+                event_type=event_type,
+                severity=severity,
                 simulation=False,
-                action="recorded",
+                action=action,
                 correlation_id=self.session_id,
             )
         )
@@ -270,6 +321,17 @@ class TcpSession:
     def _note_error(self, code: ErrorCode) -> bool:
         """Count a recoverable session error. Return True when the session must close."""
         self.stats.bump("messages_invalid")
+        if code in {
+            ErrorCode.invalid_message,
+            ErrorCode.message_too_large,
+            ErrorCode.timeout,
+            ErrorCode.rate_limited,
+            ErrorCode.quota_exceeded,
+            ErrorCode.connection_limit,
+        }:
+            from wardline.security.circuit_breaker import note_failure
+
+            note_failure(self.state, ServiceName.TCP)
         if code in _CLOSING_CODES:
             return True
         self._errors += 1

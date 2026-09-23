@@ -10,10 +10,12 @@ from wardline.errors import WardlineError
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _MAX_KEYS = 20
 
+
 @dataclass(frozen=True)
 class Schema:
     required: set[str]
     optional: set[str]
+
 
 TCP_SCHEMAS = {
     "hello": Schema(required={"client_id", "token"}, optional=set()),
@@ -28,6 +30,7 @@ UDP_SCHEMAS = {
     "ping": Schema(required={"client_id", "token", "seq", "request_id"}, optional=set()),
 }
 
+
 @dataclass(frozen=True)
 class TcpCommand:
     type: str
@@ -35,6 +38,7 @@ class TcpCommand:
     token: str | None = None
     request_id: str | None = None
     payload: str | None = None
+
 
 @dataclass(frozen=True)
 class UdpCommand:
@@ -44,13 +48,14 @@ class UdpCommand:
     seq: int | None = None
     request_id: str | None = None
 
+
 def _check_structure(
     message: Mapping[str, Any], is_http: bool = False, http_allowed: set[str] | None = None
 ) -> None:
     if len(message) > _MAX_KEYS:
         code = ErrorCode.validation_error if is_http else ErrorCode.invalid_message
         raise WardlineError(code, "invalid message")
-    
+
     for key, value in message.items():
         if isinstance(value, (list, dict)):
             if is_http and key == "details" and isinstance(value, dict):
@@ -61,6 +66,7 @@ def _check_structure(
             code = ErrorCode.validation_error if is_http else ErrorCode.invalid_message
             raise WardlineError(code, "invalid message")
 
+
 def _validate_request_id(value: Any, is_http: bool = False) -> str:
     if not isinstance(value, str):
         code = ErrorCode.validation_error if is_http else ErrorCode.invalid_message
@@ -69,6 +75,7 @@ def _validate_request_id(value: Any, is_http: bool = False) -> str:
         code = ErrorCode.validation_error if is_http else ErrorCode.invalid_message
         raise WardlineError(code, "invalid message")
     return value
+
 
 def _validate_payload(value: Any, is_http: bool = False) -> str:
     if not isinstance(value, str):
@@ -79,6 +86,7 @@ def _validate_payload(value: Any, is_http: bool = False) -> str:
         raise WardlineError(code, "invalid message")
     return value
 
+
 def _validate_token(value: Any, is_http: bool = False) -> str:
     if not isinstance(value, str):
         code = ErrorCode.validation_error if is_http else ErrorCode.invalid_message
@@ -87,6 +95,7 @@ def _validate_token(value: Any, is_http: bool = False) -> str:
         code = ErrorCode.validation_error if is_http else ErrorCode.invalid_message
         raise WardlineError(code, "invalid message")
     return value
+
 
 def _validate_seq(value: Any, is_http: bool = False) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
@@ -97,21 +106,22 @@ def _validate_seq(value: Any, is_http: bool = False) -> int:
         raise WardlineError(code, "invalid seq")
     return value
 
+
 def validate_tcp(message: Mapping[str, Any]) -> TcpCommand:
     _check_structure(message)
     msg_type = message.get("type")
     if not isinstance(msg_type, str) or msg_type not in TCP_SCHEMAS:
         raise WardlineError(ErrorCode.invalid_message, "invalid message")
-    
+
     schema = TCP_SCHEMAS[msg_type]
-    
+
     for req in schema.required:
         if req not in message:
             raise WardlineError(ErrorCode.invalid_message, "invalid message")
-            
+
     kwargs: dict[str, Any] = {"type": msg_type}
     allowed = schema.required | schema.optional
-    
+
     for field in allowed:
         if field in message:
             val = message[field]
@@ -123,24 +133,25 @@ def validate_tcp(message: Mapping[str, Any]) -> TcpCommand:
                 kwargs[field] = _validate_request_id(val)
             elif field == "payload":
                 kwargs[field] = _validate_payload(val)
-                
+
     return TcpCommand(**kwargs)
+
 
 def validate_udp(message: Mapping[str, Any]) -> UdpCommand:
     _check_structure(message)
     msg_type = message.get("type")
     if not isinstance(msg_type, str) or msg_type not in UDP_SCHEMAS:
         raise WardlineError(ErrorCode.invalid_message, "invalid message")
-    
+
     schema = UDP_SCHEMAS[msg_type]
-    
+
     for req in schema.required:
         if req not in message:
             raise WardlineError(ErrorCode.invalid_message, "invalid message")
-            
+
     kwargs: dict[str, Any] = {"type": msg_type}
     allowed = schema.required | schema.optional
-    
+
     for field in allowed:
         if field in message:
             val = message[field]
@@ -152,8 +163,9 @@ def validate_udp(message: Mapping[str, Any]) -> UdpCommand:
                 kwargs[field] = _validate_request_id(val)
             elif field == "seq":
                 kwargs[field] = _validate_seq(val)
-                
+
     return UdpCommand(**kwargs)
+
 
 def validate_admin_body(payload: Mapping[str, Any], *, allowed: set[str]) -> dict[str, Any]:
     _check_structure(payload, is_http=True, http_allowed=allowed)

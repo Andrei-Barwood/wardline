@@ -96,6 +96,9 @@ class UdpServer:
             message = parse_datagram(data, max_bytes=self.state.settings.udp_max_datagram_bytes)
             client_id = validate_client_id(message.client_id)
         except WardlineError as caught:
+            from wardline.security.circuit_breaker import note_failure
+
+            note_failure(self.state, ServiceName.UDP)
             self._audit(caught.code, host)
             if self.state.rate_limiter.allow(f"udp-invalid:{host}"):
                 self._reply_error(addr, caught.code, caught.message)
@@ -103,14 +106,17 @@ class UdpServer:
 
         assert message.seq is not None
         self._note_seq(client_id, message.seq)
-        
+
         token = message.token
         if not isinstance(token, str) or not token:
+            from wardline.security.circuit_breaker import note_failure
+
+            note_failure(self.state, ServiceName.UDP)
             self._audit_auth_failure(client_id, "missing")
             if self.state.rate_limiter.allow(f"udp-invalid:{host}"):
                 self._reply_error(addr, ErrorCode.invalid_message, "invalid message")
             return
-            
+
         principal = self.state.auth.authenticate_request(token, client_id=client_id)
         if principal is None or not principal.authenticated:
             self._audit_auth_failure(client_id, "mismatch")
@@ -118,7 +124,18 @@ class UdpServer:
                 self._reply_error(addr, ErrorCode.unauthorized, "unauthorized")
             return
 
+        from wardline.security.circuit_breaker import note_success
+
+        if not self.state.circuit_breakers.allow(ServiceName.UDP):
+            from wardline.security.circuit_breaker import note_failure
+
+            note_failure(self.state, ServiceName.UDP)
+            return
+
         if not self.state.rate_limiter.allow(f"udp:{client_id}"):
+            from wardline.security.circuit_breaker import note_failure
+
+            note_failure(self.state, ServiceName.UDP)
             self.state.udp_stats.bump("datagrams_dropped")
             rate_event = SecurityEvent(
                 timestamp=self.state.clock.now(),
@@ -133,7 +150,28 @@ class UdpServer:
             self.state.events.add(rate_event)
             self.state.audit.append(rate_event)
             return
-            
+
+        if not self.state.quotas.allow(client_id):
+            from wardline.security.circuit_breaker import note_failure
+
+            note_failure(self.state, ServiceName.UDP)
+            self.state.udp_stats.bump("datagrams_dropped")
+            quota_event = SecurityEvent(
+                timestamp=self.state.clock.now(),
+                source=client_id,
+                service=ServiceName.UDP,
+                event_type="security_quota_exceeded",
+                severity=Severity.MEDIUM,
+                simulation=False,
+                action="rejected",
+                correlation_id=str(uuid.uuid4()),
+            )
+            self.state.events.add(quota_event)
+            self.state.audit.append(quota_event)
+            return
+
+        note_success(self.state, ServiceName.UDP)
+
         role = principal.role
         if message.type == "beacon":
             reply: dict[str, Any] = {

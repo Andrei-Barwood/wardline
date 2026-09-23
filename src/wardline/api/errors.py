@@ -34,6 +34,8 @@ def status_for(code: ErrorCode) -> int:
         ErrorCode.forbidden: 403,
         ErrorCode.not_found: 404,
         ErrorCode.rate_limited: 429,
+        ErrorCode.quota_exceeded: 429,
+        ErrorCode.circuit_open: 503,
         ErrorCode.internal: 500,
     }.get(code, 400)
 

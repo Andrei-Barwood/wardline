@@ -62,4 +62,3 @@ class ApiKeyRegistry:
                 if matched_role is None:
                     matched_role = role
         return matched_role
-

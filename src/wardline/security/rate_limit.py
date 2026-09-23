@@ -10,8 +10,7 @@ class RateLimiter(Protocol):
     def allow(self, key: str, *, cost: int = 1) -> bool:
         """Return True when the caller may proceed."""
 
-    def retry_after(self, key: str) -> int:
-        ...
+    def retry_after(self, key: str) -> int: ...
 
 
 class TokenBucketLimiter:

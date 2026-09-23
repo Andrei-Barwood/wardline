@@ -28,9 +28,7 @@ def settings_factory(tmp_path: Path) -> Callable[..., Settings]:
             "tcp_port": 0,
             "udp_port": 0,
             "database_url": f"sqlite:///{tmp_path / 'wardline.db'}",
-            "dev_api_keys": (
-                "viewer:dev-viewer-key,operator:dev-operator-key,admin:dev-admin-key"
-            ),
+            "dev_api_keys": ("viewer:dev-viewer-key,operator:dev-operator-key,admin:dev-admin-key"),
             "rate_limit_requests_per_minute": 60,
             "rate_limit_burst": 2,
         }
@@ -66,7 +64,6 @@ def tcp_hello() -> Callable[..., dict[str, object]]:
         }
 
     return factory
-
 
 
 @pytest.fixture

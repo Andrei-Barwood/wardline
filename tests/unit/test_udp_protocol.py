@@ -36,8 +36,7 @@ def test_encode_small_refuses_large_object() -> None:
 
 def test_seq_must_be_non_negative_int() -> None:
     parsed = parse_datagram(
-        b'{"type":"beacon","client_id":"a","token":"secret","seq":0}',
-        max_bytes=1024
+        b'{"type":"beacon","client_id":"a","token":"secret","seq":0}', max_bytes=1024
     )
     assert parsed.seq == 0
     for raw in (

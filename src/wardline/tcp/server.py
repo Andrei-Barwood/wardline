@@ -5,9 +5,7 @@ import socket
 import uuid
 
 from wardline.contracts import ErrorCode, SecurityEvent, ServiceName, Severity
-from wardline.errors import WardlineError
 from wardline.runtime import AppState
-from wardline.security.limits import check_connection_capacity
 from wardline.tcp.protocol import encode
 from wardline.tcp.session import TcpSession
 
@@ -73,9 +71,20 @@ class TcpServer:
         accepted = False
         try:
             try:
-                check_connection_capacity(self._active, self.state.settings.tcp_max_connections)
+                from wardline.security.backpressure import admission_allowed
+
+                if not admission_allowed(
+                    active=self._active, limit=self.state.settings.tcp_max_connections
+                ):
+                    from wardline.contracts import ErrorCode
+                    from wardline.errors import WardlineError
+
+                    raise WardlineError(ErrorCode.connection_limit, "connection limit")
             except WardlineError as caught:
                 self.state.tcp_stats.bump("connections_rejected")
+                from wardline.security.circuit_breaker import note_failure
+
+                note_failure(self.state, ServiceName.TCP)
                 _audit_tcp(self.state, caught.code, "unknown")
                 await _write_error(writer, caught.code, caught.message)
                 return

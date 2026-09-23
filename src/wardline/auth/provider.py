@@ -50,4 +50,3 @@ class ApiKeyAuthProvider:
 
     def authenticate(self, token: str | None) -> Principal | None:
         return self.authenticate_request(token, client_id=None)
-

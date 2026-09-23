@@ -302,4 +302,3 @@ async def test_tcp_invalid_message_is_audited(
             assert "dev-admin-key" not in ev.model_dump_json()
     finally:
         await running.stop()
-

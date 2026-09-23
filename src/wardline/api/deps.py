@@ -125,11 +125,10 @@ def require_role(*allowed: Role) -> Callable[..., Principal]:
     return dependency
 
 
-
 def check_rate_limit(request: Request, state: LabState) -> None:
     host = request.client.host if request.client is not None else "unknown"
     key = f"anon:{host}"
-    
+
     # Extract client_id manually if authorized, because we can't easily access principal
     auth_header = request.headers.get("authorization")
     api_key_header = request.headers.get("x-api-key")
@@ -138,24 +137,35 @@ def check_rate_limit(request: Request, state: LabState) -> None:
         token = auth_header.split(" ")[1]
     elif api_key_header:
         token = api_key_header
-        
+
     client_id_header = request.headers.get("x-client-id")
-    
+
     if token:
         from wardline.clients.identity import validate_client_id
         from wardline.errors import WardlineError
+
         valid_client_id = None
         if client_id_header:
             try:
                 valid_client_id = validate_client_id(client_id_header)
             except WardlineError:
                 pass
-        
+
         principal = state.auth.authenticate_request(token, client_id=valid_client_id)
         if principal and principal.authenticated:
             key = principal.client_id
-            
+
     if not state.rate_limiter.allow(key):
         state.metrics.bump("http", "rate_limited_total")
         retry = state.rate_limiter.retry_after(key)
         raise RateLimitedError("rate limited", retry_after=retry, source=key)
+
+
+def check_circuit(request: Request, state: LabState) -> None:
+    if not state.circuit_breakers.allow(ServiceName.HTTP):
+        raise WardlineError(ErrorCode.circuit_open, "circuit open")
+
+
+def check_quota(principal: PrincipalDep, state: LabState) -> None:
+    if not state.quotas.allow(principal.client_id):
+        raise WardlineError(ErrorCode.quota_exceeded, "quota exceeded")

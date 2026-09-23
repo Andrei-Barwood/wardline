@@ -102,4 +102,11 @@ def build_state(settings: Settings, *, clock: Clock | None = None) -> AppState:
         ),
         audit_callback=_audit,
     )
+    state.circuit_breakers = CircuitBreakerRegistry(
+        threshold=state.settings.circuit_failure_threshold,
+        window_seconds=state.settings.circuit_window_seconds,
+        open_seconds=state.settings.circuit_open_seconds,
+        audit_callback=_audit,
+        clock=active_clock,
+    )
     return state
