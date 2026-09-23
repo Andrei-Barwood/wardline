@@ -20,6 +20,7 @@ from wardline.storage.memory import (
     MemoryEventRepository,
     MemoryIncidentRepository,
 )
+from wardline.storage.sqlite import SqliteEventRepository
 
 
 @dataclass
@@ -62,7 +63,9 @@ def build_state(settings: Settings, *, clock: Clock | None = None) -> AppState:
         started_at=started_at,
         clock=active_clock,
         auth=ApiKeyAuthProvider(settings.dev_api_keys),
-        events=MemoryEventRepository(),
+        events=SqliteEventRepository(settings.database_url)
+        if settings.database_url.startswith("sqlite")
+        else MemoryEventRepository(),
         incidents=MemoryIncidentRepository(),
         metrics=MetricsRegistry(
             clock=active_clock,
@@ -91,8 +94,9 @@ def build_state(settings: Settings, *, clock: Clock | None = None) -> AppState:
     )
 
     def _audit(evt: SecurityEvent) -> None:
-        state.audit.append(evt)
-        state.events.add(evt)
+        from wardline.security.events import record_event
+
+        record_event(state, evt)
 
     state.rate_limiter = TokenBucketLimiter(
         clock=active_clock,

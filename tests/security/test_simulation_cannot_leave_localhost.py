@@ -23,7 +23,7 @@ async def test_inprocess_does_not_open_sockets(monkeypatch):
 
     monkeypatch.setattr(socket, "socket", fake_socket)
 
-    state = build_state(Settings(wardline_env="test"))
+    state = build_state(Settings(wardline_env="test", database_url="sqlite:///:memory:"))
     for scenario in [
         simulate_burst,
         simulate_udp_burst,
@@ -55,7 +55,7 @@ async def test_route_schema_rejects_host_parameter_and_socket_not_called(monkeyp
 
     monkeypatch.setattr(socket, "socket", fake_socket)
 
-    state = build_state(Settings(wardline_env="test"))
+    state = build_state(Settings(wardline_env="test", database_url="sqlite:///:memory:"))
     app = create_app(state)
     transport = ASGITransport(app=app)
 

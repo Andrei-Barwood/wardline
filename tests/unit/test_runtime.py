@@ -31,7 +31,7 @@ def _event() -> SecurityEvent:
 
 
 def test_build_state_returns_app_state() -> None:
-    settings = Settings()
+    settings = Settings(database_url="sqlite:///:memory:")
     state = build_state(settings)
     assert isinstance(state, AppState)
     assert state.settings is settings
@@ -51,12 +51,12 @@ def test_validate_settings_rejects_non_sqlite_url() -> None:
 
 
 def test_validate_settings_accepts_loopback() -> None:
-    validate_settings(Settings())
+    validate_settings(Settings(database_url="sqlite:///:memory:"))
     validate_settings(Settings(http_host="localhost", tcp_host="::1", udp_host="127.0.0.1"))
 
 
 def test_null_components_do_not_raise() -> None:
-    state = build_state(Settings())
+    state = build_state(Settings(database_url="sqlite:///:memory:"))
     assert state.auth.authenticate(None) is None
     assert state.auth.authenticate("not-a-key") is None
     event = _event()

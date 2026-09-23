@@ -6,6 +6,7 @@ import uuid
 
 from wardline.contracts import ErrorCode, SecurityEvent, ServiceName, Severity
 from wardline.runtime import AppState
+from wardline.security.events import record_event
 from wardline.tcp.protocol import encode
 from wardline.tcp.session import TcpSession
 
@@ -110,7 +111,8 @@ class TcpServer:
 
 
 def _audit_tcp(state: AppState, code: ErrorCode, source: str) -> None:
-    state.audit.append(
+    record_event(
+        state,
         SecurityEvent(
             timestamp=state.clock.now(),
             source=source,
@@ -120,7 +122,7 @@ def _audit_tcp(state: AppState, code: ErrorCode, source: str) -> None:
             simulation=False,
             action="recorded",
             correlation_id=str(uuid.uuid4()),
-        )
+        ),
     )
 
 

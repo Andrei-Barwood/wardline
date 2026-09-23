@@ -28,6 +28,7 @@ from wardline.contracts import ErrorCode, Role, SecurityEvent, ServiceName, Seve
 from wardline.errors import WardlineError
 from wardline.logsetup import get_logger
 from wardline.runtime import AppState, build_state
+from wardline.security.events import record_event
 
 
 class RequestContextMiddleware:
@@ -50,7 +51,8 @@ class RequestContextMiddleware:
         method = str(scope.get("method", ""))
         path = str(scope.get("path", "")).split("?", 1)[0]
         if too_large:
-            self.lab.audit.append(
+            record_event(
+                self.lab,
                 SecurityEvent(
                     timestamp=self.lab.clock.now(),
                     source="http",
@@ -60,7 +62,7 @@ class RequestContextMiddleware:
                     simulation=False,
                     action="rejected",
                     correlation_id=correlation_id,
-                )
+                ),
             )
             await _send_json(
                 send,
@@ -165,7 +167,8 @@ def _install_handlers(app: FastAPI) -> None:
             ErrorCode.timeout,
         }
         if exc.code in audited:
-            app.state.lab.audit.append(
+            record_event(
+                app.state.lab,
                 SecurityEvent(
                     timestamp=app.state.lab.clock.now(),
                     source=getattr(exc, "source", "http"),
@@ -175,7 +178,7 @@ def _install_handlers(app: FastAPI) -> None:
                     simulation=False,
                     action="rejected",
                     correlation_id=correlation_id,
-                )
+                ),
             )
         headers: dict[str, str] = {}
         if exc.code == ErrorCode.unauthorized:

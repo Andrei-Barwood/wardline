@@ -11,10 +11,12 @@ class MemoryEventRepository:
     """Event store that keeps rows in process order."""
 
     def __init__(self) -> None:
-        self._events: list[SecurityEvent] = []
+        self._events: list[tuple[int, SecurityEvent]] = []
+        self._next_id = 1
 
     def add(self, event: SecurityEvent) -> None:
-        self._events.append(event)
+        self._events.append((self._next_id, event))
+        self._next_id += 1
 
     def list_events(
         self,
@@ -26,7 +28,8 @@ class MemoryEventRepository:
     ) -> list[SecurityEvent]:
         bounded = min(500, limit) if limit >= 1 else 1
         matched: list[SecurityEvent] = []
-        for event in reversed(self._events):
+        sorted_events = sorted(self._events, key=lambda x: (x[1].timestamp, x[0]), reverse=True)
+        for _, event in sorted_events:
             if (
                 min_severity is not None
                 and SEVERITY_RANK[event.severity] < SEVERITY_RANK[min_severity]
@@ -86,3 +89,6 @@ class MemoryConfigHistory:
 
     def current_generation(self) -> int:
         return self._generation
+
+    def close(self) -> None:
+        pass

@@ -14,7 +14,7 @@ from wardline.simulation.scenarios import SimulationMode
 
 @pytest.mark.asyncio
 async def test_each_scenario_event_type_and_flag():
-    state = build_state(Settings(wardline_env="test"))
+    state = build_state(Settings(wardline_env="test", database_url="sqlite:///:memory:"))
     await simulate_burst(state, mode=SimulationMode.inprocess)
 
     events = state.events.list_events(limit=10)
@@ -27,7 +27,7 @@ async def test_each_scenario_event_type_and_flag():
 
 @pytest.mark.asyncio
 async def test_simulate_all_runs_four():
-    state = build_state(Settings(wardline_env="test"))
+    state = build_state(Settings(wardline_env="test", database_url="sqlite:///:memory:"))
     result = await simulate_all(state, mode=SimulationMode.inprocess)
     events = state.events.list_events(limit=100)
     assert len(events) == 16

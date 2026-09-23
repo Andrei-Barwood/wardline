@@ -11,6 +11,7 @@ from wardline.contracts import ErrorCode, Principal, Role, SecurityEvent, Servic
 from wardline.errors import WardlineError
 from wardline.monitoring.stats import TransportStats
 from wardline.runtime import AppState
+from wardline.security.events import record_event
 from wardline.security.validation import TcpCommand
 from wardline.tcp.protocol import encode, parse_line
 
@@ -159,7 +160,8 @@ class TcpSession:
         token = message.token
         if not isinstance(token, str) or not token:
             self.state.rate_limiter.allow(f"tcp-unauth:{ip}")
-            self.state.audit.append(
+            record_event(
+                self.state,
                 SecurityEvent(
                     timestamp=self.state.clock.now(),
                     source=client_id,
@@ -170,7 +172,7 @@ class TcpSession:
                     action="rejected",
                     correlation_id=self.session_id,
                     details={"reason": "missing"},
-                )
+                ),
             )
             await self._fail(ErrorCode.invalid_message, "invalid message", None, closing=True)
             return "stop"
@@ -178,7 +180,8 @@ class TcpSession:
         principal = self.state.auth.authenticate_request(token, client_id=client_id)
         if principal is None or not principal.authenticated:
             self.state.rate_limiter.allow(f"tcp-unauth:{ip}")
-            self.state.audit.append(
+            record_event(
+                self.state,
                 SecurityEvent(
                     timestamp=self.state.clock.now(),
                     source=client_id,
@@ -189,7 +192,7 @@ class TcpSession:
                     action="rejected",
                     correlation_id=self.session_id,
                     details={"reason": "mismatch"},
-                )
+                ),
             )
             await self._fail(ErrorCode.unauthorized, "unauthorized", None, closing=True)
             return "stop"
@@ -232,7 +235,8 @@ class TcpSession:
             required_role = TCP_COMMAND_MIN_ROLE.get(message_type, Role.ADMIN)
             actual_role = self.principal.role if self.principal is not None else Role.VIEWER
             if not role_allows(actual_role, required_role):
-                self.state.audit.append(
+                record_event(
+                    self.state,
                     SecurityEvent(
                         timestamp=self.state.clock.now(),
                         source=self.client_id or "unknown",
@@ -243,7 +247,7 @@ class TcpSession:
                         action="denied",
                         correlation_id=self.session_id,
                         details={"required": required_role.value},
-                    )
+                    ),
                 )
                 closing = self._note_error(ErrorCode.forbidden)
                 visible_id = request_id if isinstance(request_id, str) else None
@@ -299,7 +303,8 @@ class TcpSession:
         severity = Severity.MEDIUM if code == ErrorCode.quota_exceeded else Severity.LOW
         action = "rejected" if code == ErrorCode.quota_exceeded else "recorded"
         event_type = "security_quota_exceeded" if code == ErrorCode.quota_exceeded else code.value
-        self.state.audit.append(
+        record_event(
+            self.state,
             SecurityEvent(
                 timestamp=self.state.clock.now(),
                 source=self.client_id or "unknown",
@@ -309,7 +314,7 @@ class TcpSession:
                 simulation=False,
                 action=action,
                 correlation_id=self.session_id,
-            )
+            ),
         )
 
     def _allow_rate(self) -> bool:

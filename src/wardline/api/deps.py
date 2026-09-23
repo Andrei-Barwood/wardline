@@ -11,6 +11,7 @@ from wardline.clients.identity import validate_client_id
 from wardline.contracts import ErrorCode, Principal, Role, SecurityEvent, ServiceName, Severity
 from wardline.errors import RateLimitedError, WardlineError
 from wardline.runtime import AppState
+from wardline.security.events import record_event
 
 
 def get_state(request: Request) -> AppState:
@@ -31,7 +32,8 @@ def require_principal(request: Request) -> Principal:
 
     def _fail_auth(reason: str, source: str = "unknown") -> NoReturn:
         lab.metrics.bump("http", "unauthorized_total")
-        lab.audit.append(
+        record_event(
+            lab,
             SecurityEvent(
                 timestamp=lab.clock.now(),
                 source=source,
@@ -42,7 +44,7 @@ def require_principal(request: Request) -> Principal:
                 action="rejected",
                 correlation_id=correlation_id,
                 details={"reason": reason},
-            )
+            ),
         )
         raise WardlineError(ErrorCode.unauthorized, "unauthorized")
 
@@ -106,7 +108,8 @@ def require_role(*allowed: Role) -> Callable[..., Principal]:
             required_name = (
                 allowed[0].value if len(allowed) == 1 else ",".join(r.value for r in allowed)
             )
-            lab.audit.append(
+            record_event(
+                lab,
                 SecurityEvent(
                     timestamp=lab.clock.now(),
                     source=principal.client_id,
@@ -117,7 +120,7 @@ def require_role(*allowed: Role) -> Callable[..., Principal]:
                     action="denied",
                     correlation_id=correlation_id,
                     details={"required": required_name},
-                )
+                ),
             )
             raise WardlineError(ErrorCode.forbidden, "forbidden")
         return principal

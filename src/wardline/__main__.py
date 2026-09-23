@@ -88,6 +88,8 @@ async def _serve(state: AppState, only: str) -> None:
             await tcp.stop()
         if http is not None and http.task is not None and not http.task.done():
             await http.stop()
+        if hasattr(state.events, "close"):
+            state.events.close()
 
 
 if __name__ == "__main__":

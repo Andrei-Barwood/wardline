@@ -6,6 +6,7 @@ import httpx
 
 from wardline.contracts import SecurityEvent, ServiceName, Severity
 from wardline.runtime import AppState
+from wardline.security.events import record_event
 from wardline.simulation.guard import (
     SIMULATION_MAX_CONNECTIONS,
     SIMULATION_MAX_DATAGRAMS,
@@ -51,7 +52,7 @@ def _record_synthetic_event(
         correlation_id=correlation_id,
         details={"synthetic": True, "sequence": sequence},
     )
-    state.events.add(event)
+    record_event(state, event)
 
 
 def _handle_refusal(state: AppState, reason: str, correlation_id: str) -> None:
@@ -66,7 +67,7 @@ def _handle_refusal(state: AppState, reason: str, correlation_id: str) -> None:
         correlation_id=correlation_id,
         details={"synthetic": True, "reason": reason},
     )
-    state.events.add(event)
+    record_event(state, event)
 
 
 async def simulate_burst(state: AppState, *, mode: SimulationMode) -> SimulationResult:

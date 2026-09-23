@@ -13,6 +13,7 @@ from wardline.clients.identity import validate_client_id
 from wardline.contracts import ErrorCode, SecurityEvent, ServiceName, Severity
 from wardline.errors import WardlineError
 from wardline.runtime import AppState
+from wardline.security.events import record_event
 from wardline.udp.protocol import encode_small, parse_datagram
 
 _LOCAL_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
@@ -24,7 +25,8 @@ def accept_peer(state: AppState, host: str) -> bool:
     if host in _LOCAL_HOSTS:
         return True
     state.udp_stats.bump("datagrams_dropped")
-    state.events.add(
+    record_event(
+        state,
         SecurityEvent(
             timestamp=state.clock.now(),
             source="unknown",
@@ -35,7 +37,7 @@ def accept_peer(state: AppState, host: str) -> bool:
             action="dropped",
             correlation_id=str(uuid.uuid4()),
             details={"host": host},
-        )
+        ),
     )
     return False
 
@@ -147,8 +149,7 @@ class UdpServer:
                 action="dropped",
                 correlation_id=str(uuid.uuid4()),
             )
-            self.state.events.add(rate_event)
-            self.state.audit.append(rate_event)
+            record_event(self.state, rate_event)
             return
 
         if not self.state.quotas.allow(client_id):
@@ -166,8 +167,7 @@ class UdpServer:
                 action="rejected",
                 correlation_id=str(uuid.uuid4()),
             )
-            self.state.events.add(quota_event)
-            self.state.audit.append(quota_event)
+            record_event(self.state, quota_event)
             return
 
         note_success(self.state, ServiceName.UDP)
@@ -191,7 +191,8 @@ class UdpServer:
         self.state.udp_stats.bump("datagrams_valid")
 
     def _audit(self, code: ErrorCode, source: str) -> None:
-        self.state.audit.append(
+        record_event(
+            self.state,
             SecurityEvent(
                 timestamp=self.state.clock.now(),
                 source=source,
@@ -201,11 +202,12 @@ class UdpServer:
                 simulation=False,
                 action="dropped",
                 correlation_id=str(uuid.uuid4()),
-            )
+            ),
         )
 
     def _audit_auth_failure(self, source: str, reason: str) -> None:
-        self.state.audit.append(
+        record_event(
+            self.state,
             SecurityEvent(
                 timestamp=self.state.clock.now(),
                 source=source,
@@ -216,7 +218,7 @@ class UdpServer:
                 action="rejected",
                 correlation_id=str(uuid.uuid4()),
                 details={"reason": reason},
-            )
+            ),
         )
 
     def _note_seq(self, client_id: str, seq: int) -> None:
@@ -226,7 +228,8 @@ class UdpServer:
         while len(self._last_seq) > _SEQ_LIMIT:
             self._last_seq.popitem(last=False)
         if previous is not None and seq < previous:
-            self.state.events.add(
+            record_event(
+                self.state,
                 SecurityEvent(
                     timestamp=self.state.clock.now(),
                     source=client_id,
@@ -236,7 +239,7 @@ class UdpServer:
                     simulation=False,
                     action="recorded",
                     correlation_id=str(uuid.uuid4()),
-                )
+                ),
             )
 
     def _reply_error(
