@@ -64,5 +64,17 @@ El formato sigue Keep a Changelog.
 * **Automatic Test Markers**: Configured `pytest_collection_modifyitems` in `tests/conftest.py` to automatically assign `unit`, `integration`, and `security` markers based on test paths without manual markers.
 * **Coverage Analysis & Gap Audit**: Generated code coverage audit across the suite reaching 84% total coverage (>90% on core decision logic) and documented uncovered entrypoints in `docs/test-gaps.md`.
 
+### PROMPT 20 — Tests de integración
+* **Live Stack Fixture**: Implemented `Stack` dataclass and `stack` async fixture in `tests/integration/conftest.py` binding HTTP, TCP, and UDP on loopback (`127.0.0.1`) with ephemeral ports (`0`), isolated SQLite storage in `tmp_path`, and automated resource disposal.
+* **Network Testing Helpers**: Added `open_tcp`, `send_tcp_line`, `read_tcp_line`, and `roundtrip_udp` with asyncio sockets in `tests/integration/conftest.py`.
+* **Chapter Scenarios**:
+  - `tests/integration/test_stack_chapter1.py`: Verified `GET /version`, `GET /health`, TCP ping-pong, UDP beacon-ack, and structured correlation ID logging.
+  - `tests/integration/test_stack_chapter2.py`: Validated role-based boundaries on live HTTP endpoints (anonymous 401, viewer 200/403, operator 200 simulation run, admin 200 config access, operator 403 config edit).
+  - `tests/integration/test_stack_chapter3.py`: Enforced burst rate limits (429 on third request), TCP oversized line connection drops with EOF, and silent drop on oversized UDP datagrams without replies.
+  - `tests/integration/test_stack_chapter4.py`: Verified four in-process simulation runs, presence of synthetic event types in `GET /events`, security summary metrics, and medium-severity alert queries.
+  - `tests/integration/test_stack_chapter5.py`: Executed complete incident lifecycle (connection pressure anomaly detection -> acknowledge -> contain with client block -> resolve with selective unblock -> post-resolution TCP ping).
+* **Database Persistence Across Restarts**: Implemented `tests/integration/test_sqlite_restart_keeps_events.py` verifying that events and incidents survive complete stack shutdowns and are queryable in subsequent instances.
+
+
 
 

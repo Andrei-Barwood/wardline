@@ -185,4 +185,3 @@ def test_reset_main_entrypoint(
     main()
     captured = capsys.readouterr()
     assert "nothing to reset" in captured.out
-
