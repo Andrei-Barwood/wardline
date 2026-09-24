@@ -197,6 +197,10 @@ class TcpSession:
             await self._fail(ErrorCode.unauthorized, "unauthorized", None, closing=True)
             return "stop"
 
+        if self.state.blocks.is_blocked(client_id, self.state.clock.now()):
+            await self._fail(ErrorCode.client_blocked, "client blocked", None, closing=True)
+            return "stop"
+
         if not self.state.circuit_breakers.allow(ServiceName.TCP):
             closing = self._note_error(ErrorCode.circuit_open)
             await self._fail(ErrorCode.circuit_open, "circuit open", None, closing=closing)

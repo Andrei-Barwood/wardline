@@ -34,3 +34,11 @@ El formato sigue Keep a Changelog.
 * **Monitoring endpoints**: Added `GET /metrics`, `GET /alerts`, and `GET /security/summary` exposing system metrics, alerts, and security overview to viewers and operators.
 * **Active blocks**: Exposed `count_active(now)` on `BlockRegistry` and `InMemoryBlockRegistry`.
 * **Testing**: Added unit and integration tests in `tests/unit/test_metrics_shape.py`, `tests/unit/test_alerts_selection.py`, and `tests/integration/test_monitoring_api.py`.
+
+### PROMPT 16 — Gestión de incidentes
+* **Incident state machine**: Implemented `transition` in `src/wardline/incidents/machine.py` enforcing immutable state progressions (`DETECTED` -> `INVESTIGATING` -> `CONTAINED` -> `RECOVERING` -> `RESOLVED`).
+* **Incident persistence**: Extended `src/wardline/storage/sqlite.py` with `incidents` and `incident_actions` tables and `SqliteIncidentRepository`.
+* **Logical client blocking**: Implemented in-memory process-scoped client blocking in `src/wardline/clients/blocks.py`, enforced across HTTP, TCP, and UDP traffic.
+* **Incident & Admin API**: Added `GET /incidents`, `GET /incidents/{id}`, `POST /incidents/{id}/acknowledge`, `POST /incidents/{id}/contain`, `POST /incidents/{id}/resolve`, and `POST /admin/clients/{client_id}/unblock`.
+* **Testing**: Added tests in `tests/unit/test_incident_machine.py`, `tests/integration/test_incident_routes.py`, and `tests/security/test_incident_authorization.py`.
+

@@ -88,6 +88,13 @@ def require_principal(request: Request) -> Principal:
     if principal is None or not principal.authenticated:
         _fail_auth("mismatch", effective_source)
 
+    if lab.blocks.is_blocked(principal.client_id, lab.clock.now()):
+        raise WardlineError(
+            ErrorCode.client_blocked,
+            "client blocked",
+            source=principal.client_id,
+        )
+
     return principal
 
 

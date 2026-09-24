@@ -32,7 +32,9 @@ def status_for(code: ErrorCode) -> int:
     return {
         ErrorCode.unauthorized: 401,
         ErrorCode.forbidden: 403,
+        ErrorCode.client_blocked: 403,
         ErrorCode.not_found: 404,
+        ErrorCode.invalid_state_transition: 409,
         ErrorCode.rate_limited: 429,
         ErrorCode.quota_exceeded: 429,
         ErrorCode.circuit_open: 503,

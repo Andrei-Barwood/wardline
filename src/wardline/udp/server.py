@@ -126,6 +126,12 @@ class UdpServer:
                 self._reply_error(addr, ErrorCode.unauthorized, "unauthorized")
             return
 
+        if self.state.blocks.is_blocked(client_id, self.state.clock.now()):
+            self.state.udp_stats.bump("datagrams_dropped")
+            if self.state.rate_limiter.allow(f"udp-invalid:{host}"):
+                self._reply_error(addr, ErrorCode.client_blocked, "client blocked")
+            return
+
         from wardline.security.circuit_breaker import note_success
 
         if not self.state.circuit_breakers.allow(ServiceName.UDP):

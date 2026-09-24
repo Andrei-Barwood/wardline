@@ -6,9 +6,10 @@ from wardline.contracts import ErrorCode
 class WardlineError(Exception):
     """Domain error that later prompts map to an HTTP or protocol response."""
 
-    def __init__(self, code: ErrorCode, message: str) -> None:
+    def __init__(self, code: ErrorCode, message: str, source: str | None = None) -> None:
         self.code = code
         self.message = message
+        self.source = source if source is not None else "http"
         super().__init__(message)
 
 

@@ -106,8 +106,10 @@ def create_app(state: AppState | None = None) -> FastAPI:
     app.add_middleware(RequestContextMiddleware, lab=lab)
 
     from wardline.api.deps import check_circuit, check_quota, check_rate_limit
+    from wardline.api.routes.admin import router as admin_router
     from wardline.api.routes.alerts import router as alerts_router
     from wardline.api.routes.events import router as events_router
+    from wardline.api.routes.incidents import router as incidents_router
     from wardline.api.routes.metrics import router as metrics_router
     from wardline.api.routes.security import router as security_router
 
@@ -130,6 +132,8 @@ def create_app(state: AppState | None = None) -> FastAPI:
     authed_router.include_router(metrics_router)
     authed_router.include_router(alerts_router)
     authed_router.include_router(security_router)
+    authed_router.include_router(incidents_router)
+    authed_router.include_router(admin_router)
 
 
     app.include_router(public_router)
@@ -181,7 +185,7 @@ def _install_handlers(app: FastAPI) -> None:
                 app.state.lab,
                 SecurityEvent(
                     timestamp=app.state.lab.clock.now(),
-                    source=getattr(exc, "source", "http"),
+                    source=getattr(exc, "source", None) or "http",
                     service=ServiceName.HTTP,
                     event_type=exc.code.value,
                     severity=Severity.LOW,

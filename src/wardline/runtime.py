@@ -20,7 +20,7 @@ from wardline.storage.memory import (
     MemoryEventRepository,
     MemoryIncidentRepository,
 )
-from wardline.storage.sqlite import SqliteEventRepository
+from wardline.storage.sqlite import SqliteEventRepository, SqliteIncidentRepository
 
 
 @dataclass
@@ -66,7 +66,9 @@ def build_state(settings: Settings, *, clock: Clock | None = None) -> AppState:
         events=SqliteEventRepository(settings.database_url)
         if settings.database_url.startswith("sqlite")
         else MemoryEventRepository(),
-        incidents=MemoryIncidentRepository(),
+        incidents=SqliteIncidentRepository(settings.database_url)
+        if settings.database_url.startswith("sqlite")
+        else MemoryIncidentRepository(),
         metrics=MetricsRegistry(
             clock=active_clock,
             started_at=started_at,
