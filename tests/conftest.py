@@ -76,3 +76,15 @@ async def api_client(
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         yield client
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Automatically attach unit, integration, and security markers based on test directory."""
+    for item in items:
+        path = str(item.fspath)
+        if "/tests/unit/" in path or "/tests/unit" in path:
+            item.add_marker(pytest.mark.unit)
+        elif "/tests/integration/" in path or "/tests/integration" in path:
+            item.add_marker(pytest.mark.integration)
+        elif "/tests/security/" in path or "/tests/security" in path:
+            item.add_marker(pytest.mark.security)

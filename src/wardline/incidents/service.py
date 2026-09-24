@@ -50,9 +50,7 @@ class UnverifiedHealth:
 class IncidentService:
     def __init__(self, state: AppState, health_gate: Any | None = None) -> None:
         self.state = state
-        self.health_gate: Any = (
-            health_gate if health_gate is not None else LocalHealthGate()
-        )
+        self.health_gate: Any = health_gate if health_gate is not None else LocalHealthGate()
 
     async def _check_health(self) -> tuple[bool, dict[str, Any] | None]:
         gate = self.health_gate

@@ -52,19 +52,13 @@ async def test_privilege_boundaries_on_incident_routes(
             await client.get(f"/incidents/{inc.id}", headers=auth_header("viewer"))
         ).status_code == 200
         assert (
-            await client.post(
-                f"/incidents/{inc.id}/acknowledge", headers=auth_header("viewer")
-            )
+            await client.post(f"/incidents/{inc.id}/acknowledge", headers=auth_header("viewer"))
         ).status_code == 403
         assert (
-            await client.post(
-                f"/incidents/{inc.id}/contain", headers=auth_header("viewer")
-            )
+            await client.post(f"/incidents/{inc.id}/contain", headers=auth_header("viewer"))
         ).status_code == 403
         assert (
-            await client.post(
-                f"/incidents/{inc.id}/resolve", headers=auth_header("viewer")
-            )
+            await client.post(f"/incidents/{inc.id}/resolve", headers=auth_header("viewer"))
         ).status_code == 403
         assert (
             await client.post("/admin/clients/test/unblock", headers=auth_header("viewer"))
@@ -72,19 +66,13 @@ async def test_privilege_boundaries_on_incident_routes(
 
         # 3. Operator: can read and acknowledge, forbidden to contain/resolve/unblock (403)
         assert (
-            await client.post(
-                f"/incidents/{inc.id}/acknowledge", headers=auth_header("operator")
-            )
+            await client.post(f"/incidents/{inc.id}/acknowledge", headers=auth_header("operator"))
         ).status_code == 200
         assert (
-            await client.post(
-                f"/incidents/{inc.id}/contain", headers=auth_header("operator")
-            )
+            await client.post(f"/incidents/{inc.id}/contain", headers=auth_header("operator"))
         ).status_code == 403
         assert (
-            await client.post(
-                f"/incidents/{inc.id}/resolve", headers=auth_header("operator")
-            )
+            await client.post(f"/incidents/{inc.id}/resolve", headers=auth_header("operator"))
         ).status_code == 403
         assert (
             await client.post("/admin/clients/test/unblock", headers=auth_header("operator"))
@@ -92,14 +80,10 @@ async def test_privilege_boundaries_on_incident_routes(
 
         # 4. Admin: can contain and resolve
         assert (
-            await client.post(
-                f"/incidents/{inc.id}/contain", headers=auth_header("admin")
-            )
+            await client.post(f"/incidents/{inc.id}/contain", headers=auth_header("admin"))
         ).status_code == 200
         assert (
-            await client.post(
-                f"/incidents/{inc.id}/resolve", headers=auth_header("admin")
-            )
+            await client.post(f"/incidents/{inc.id}/resolve", headers=auth_header("admin"))
         ).status_code == 200
 
 
@@ -130,9 +114,7 @@ async def test_blocked_admin_client_id_isolated(
         # Another admin (admin-2) using the SAME admin key can unblock admin-1
         headers_admin2 = dict(auth_header("admin"))
         headers_admin2["X-Client-Id"] = "admin-2"
-        unblock_resp = await client.post(
-            "/admin/clients/admin-1/unblock", headers=headers_admin2
-        )
+        unblock_resp = await client.post("/admin/clients/admin-1/unblock", headers=headers_admin2)
         assert unblock_resp.status_code == 200
         assert unblock_resp.json()["status"] == "unblocked"
 

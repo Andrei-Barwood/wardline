@@ -58,4 +58,11 @@ El formato sigue Keep a Changelog.
 * **Mission Documentation**: Documented all five missions, objectives, concepts, required actions, execution guides, and conceptual explanations in `docs/missions.md`.
 * **Testing**: Added unit and integration tests in `tests/unit/test_mission_catalog.py` and `tests/integration/test_mission_checks.py`.
 
+### PROMPT 19 — Tests unitarios
+* **Defensive Edge Case Unit Tests**: Added `tests/unit/test_defensive_edge_cases.py` covering boundary conditions: complete `SEVERITY_RANK` mapping and ties, `redact` preserving ints and nested traversal, token bucket cost above balance without negative values, quota rejection without count increments, sliding-window circuit breaker isolation, extra field dropping in `validate_tcp`, duplicate role parsing rejection in API keys, immutability on illegal incident transitions, `assert_loopback` strict octet verification (rejecting `127.0.0.2`), `select_alerts` with empty input, and path traversal escape prevention in `safe_reset`.
+* **Hardened Path Reset**: Reinforced `safe_reset(data_dir: Path, *, allowed_root: Path) -> list[Path]` requiring path resolution, target basename `data`, and strict encapsulation within `allowed_root`.
+* **Automatic Test Markers**: Configured `pytest_collection_modifyitems` in `tests/conftest.py` to automatically assign `unit`, `integration`, and `security` markers based on test paths without manual markers.
+* **Coverage Analysis & Gap Audit**: Generated code coverage audit across the suite reaching 84% total coverage (>90% on core decision logic) and documented uncovered entrypoints in `docs/test-gaps.md`.
+
+
 

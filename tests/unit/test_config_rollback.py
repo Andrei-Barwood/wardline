@@ -135,7 +135,7 @@ def test_reset_script_removes_only_data_files(tmp_path: Path) -> None:
     not_data = tmp_path / "somedir"
     not_data.mkdir()
     with pytest.raises(ValueError, match="Refusing to reset directory not named 'data'"):
-        safe_reset(not_data)
+        safe_reset(not_data, allowed_root=tmp_path)
 
     # Valid data directory
     data_dir = tmp_path / "data"
@@ -155,7 +155,7 @@ def test_reset_script_removes_only_data_files(tmp_path: Path) -> None:
     env_file = data_dir / ".env"
     env_file.write_text("KEY=val")
 
-    removed = safe_reset(data_dir)
+    removed = safe_reset(data_dir, allowed_root=tmp_path)
     removed_names = {p.name for p in removed}
     assert removed_names == {"wardline.db", "wardline.db-wal", "events.jsonl"}
 
@@ -165,3 +165,24 @@ def test_reset_script_removes_only_data_files(tmp_path: Path) -> None:
     assert not jsonl_file.exists()
     assert code_file.exists()
     assert env_file.exists()
+
+
+def test_reset_main_entrypoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "wardline.db").write_text("test")
+    monkeypatch.chdir(tmp_path)
+
+    from wardline.reset import main
+
+    main()
+    captured = capsys.readouterr()
+    assert "removed:" in captured.out
+
+    # Second run: nothing to reset
+    main()
+    captured = capsys.readouterr()
+    assert "nothing to reset" in captured.out
+

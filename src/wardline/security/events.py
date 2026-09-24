@@ -57,17 +57,15 @@ def record_event(state: AppState, event: SecurityEvent) -> None:
         details=details,
     )
 
-
     # 3. Store in repository
     state.events.add(new_event)
     state.metrics.bump("security", "events_total")
-    
+
     # Is it an alert?
     if (
         new_event.event_type.startswith("anomaly_") or new_event.event_type.startswith("security_")
     ) and SEVERITY_RANK[new_event.severity] >= SEVERITY_RANK[Severity.LOW]:
         state.metrics.bump("security", "alerts_open")
-
 
     # 4. Store in audit log (swallow error)
     try:

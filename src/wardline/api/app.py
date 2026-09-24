@@ -137,7 +137,6 @@ def create_app(state: AppState | None = None) -> FastAPI:
     authed_router.include_router(admin_router)
     authed_router.include_router(missions_router)
 
-
     app.include_router(public_router)
     app.include_router(authed_router)
     _install_handlers(app)

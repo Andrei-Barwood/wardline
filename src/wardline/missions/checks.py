@@ -81,9 +81,7 @@ async def check_m02(state: AppState) -> MissionResult:
         if viewer_ok:
             observations.append("viewer request to /incidents/{id}/contain returned 403")
         else:
-            observations.append(
-                f"viewer request to contain returned {resp_viewer.status_code}"
-            )
+            observations.append(f"viewer request to contain returned {resp_viewer.status_code}")
 
     passed = anon_ok and viewer_ok
     return MissionResult(
