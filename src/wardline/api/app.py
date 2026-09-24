@@ -106,6 +106,10 @@ def create_app(state: AppState | None = None) -> FastAPI:
     app.add_middleware(RequestContextMiddleware, lab=lab)
 
     from wardline.api.deps import check_circuit, check_quota, check_rate_limit
+    from wardline.api.routes.alerts import router as alerts_router
+    from wardline.api.routes.events import router as events_router
+    from wardline.api.routes.metrics import router as metrics_router
+    from wardline.api.routes.security import router as security_router
 
     public_router = APIRouter(dependencies=[Depends(check_rate_limit)])
     public_router.include_router(health_router)
@@ -119,8 +123,14 @@ def create_app(state: AppState | None = None) -> FastAPI:
             Depends(check_quota),
         ]
     )
+
     authed_router.include_router(status_router)
     authed_router.include_router(simulation_router)
+    authed_router.include_router(events_router)
+    authed_router.include_router(metrics_router)
+    authed_router.include_router(alerts_router)
+    authed_router.include_router(security_router)
+
 
     app.include_router(public_router)
     app.include_router(authed_router)

@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 from typing import Any
 
-from wardline.contracts import SecurityEvent
+from wardline.contracts import SEVERITY_RANK, SecurityEvent, Severity
 from wardline.runtime import AppState
 
 
@@ -16,9 +16,6 @@ def redact(details: dict[str, Any]) -> dict[str, Any]:
 
 def record_event(state: AppState, event: SecurityEvent) -> None:
     # 1. Provide timestamp if missing or clamped
-    event_dict = event.model_dump()
-    details = dict(event_dict.get("details") or {})
-
     details = dict(event.details)
 
     now = state.clock.now()
@@ -60,8 +57,17 @@ def record_event(state: AppState, event: SecurityEvent) -> None:
         details=details,
     )
 
+
     # 3. Store in repository
     state.events.add(new_event)
+    state.metrics.bump("security", "events_total")
+    
+    # Is it an alert?
+    if (
+        new_event.event_type.startswith("anomaly_") or new_event.event_type.startswith("security_")
+    ) and SEVERITY_RANK[new_event.severity] >= SEVERITY_RANK[Severity.LOW]:
+        state.metrics.bump("security", "alerts_open")
+
 
     # 4. Store in audit log (swallow error)
     try:

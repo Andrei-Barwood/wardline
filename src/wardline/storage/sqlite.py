@@ -81,7 +81,7 @@ class SqliteEventRepository:
         service: ServiceName | None = None,
         simulation: bool | None = None,
     ) -> list[SecurityEvent]:
-        bounded = min(500, max(1, limit))
+        bounded = min(5001, max(1, limit))
 
         stmt = select(security_events)
         if service is not None:

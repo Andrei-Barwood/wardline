@@ -26,7 +26,7 @@ class MemoryEventRepository:
         service: ServiceName | None = None,
         simulation: bool | None = None,
     ) -> list[SecurityEvent]:
-        bounded = min(500, limit) if limit >= 1 else 1
+        bounded = min(5001, max(1, limit))
         matched: list[SecurityEvent] = []
         sorted_events = sorted(self._events, key=lambda x: (x[1].timestamp, x[0]), reverse=True)
         for _, event in sorted_events:

@@ -28,3 +28,9 @@ El formato sigue Keep a Changelog.
 * **TokenBucketLimiter**: Replaced InMemoryRateLimiter with a real token bucket implementation using an injectable clock.
 * **HTTP**: Added `check_rate_limit` FastAPI dependency enforcing limits on both public and authenticated routes. Returns 429 and `Retry-After` header when limit exceeded.
 * **TCP & UDP**: Integrated limits checking into session creation and datagram parsing, accurately tracking consumed quotas and bypassing UDP responses when budget is exhausted.
+
+### PROMPT 15 — Monitorización
+* **Alert filtering**: Implemented `select_alerts` in `src/wardline/monitoring/alerts.py` to filter security and anomaly events with severity thresholds.
+* **Monitoring endpoints**: Added `GET /metrics`, `GET /alerts`, and `GET /security/summary` exposing system metrics, alerts, and security overview to viewers and operators.
+* **Active blocks**: Exposed `count_active(now)` on `BlockRegistry` and `InMemoryBlockRegistry`.
+* **Testing**: Added unit and integration tests in `tests/unit/test_metrics_shape.py`, `tests/unit/test_alerts_selection.py`, and `tests/integration/test_monitoring_api.py`.

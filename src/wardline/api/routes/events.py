@@ -21,8 +21,9 @@ def list_events(
     service: ServiceName | None = None,
     simulation: bool | None = None,
 ) -> ListEventsResponse:
+    bounded_limit = min(500, max(1, limit))
     events = state.events.list_events(
-        limit=limit,
+        limit=bounded_limit,
         min_severity=min_severity,
         service=service,
         simulation=simulation,

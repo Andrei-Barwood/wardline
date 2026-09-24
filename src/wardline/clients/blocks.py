@@ -14,6 +14,9 @@ class BlockRegistry(Protocol):
     def unblock(self, client_id: str) -> bool:
         """Remove blocks for the client id. Return False when nothing changed."""
 
+    def count_active(self, now: datetime) -> int:
+        """Return the number of active blocks at the given time."""
+
 
 class InMemoryBlockRegistry:
     """Stand-in that keeps the process open. Later prompts store real blocks."""
@@ -28,3 +31,7 @@ class InMemoryBlockRegistry:
     def unblock(self, client_id: str) -> bool:
         del client_id
         return False
+
+    def count_active(self, now: datetime) -> int:
+        del now
+        return 0
