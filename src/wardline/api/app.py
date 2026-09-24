@@ -111,6 +111,7 @@ def create_app(state: AppState | None = None) -> FastAPI:
     from wardline.api.routes.events import router as events_router
     from wardline.api.routes.incidents import router as incidents_router
     from wardline.api.routes.metrics import router as metrics_router
+    from wardline.api.routes.missions import router as missions_router
     from wardline.api.routes.security import router as security_router
 
     public_router = APIRouter(dependencies=[Depends(check_rate_limit)])
@@ -134,6 +135,7 @@ def create_app(state: AppState | None = None) -> FastAPI:
     authed_router.include_router(security_router)
     authed_router.include_router(incidents_router)
     authed_router.include_router(admin_router)
+    authed_router.include_router(missions_router)
 
 
     app.include_router(public_router)

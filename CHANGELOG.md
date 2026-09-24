@@ -50,4 +50,12 @@ El formato sigue Keep a Changelog.
 * **Safe Reset Utility**: Implemented `safe_reset(data_dir: Path)` in `src/wardline/storage/cleanup.py` and `scripts/reset.sh` to safely purge local databases and `.jsonl` data files while strictly rejecting paths outside `data/`.
 * **Testing**: Added test suites in `tests/unit/test_config_rollback.py`, `tests/integration/test_recovery_flow.py`, and `tests/security/test_rollback_whitelist.py`.
 
+### PROMPT 18 — Sistema de misiones
+* **Mission Catalog and Models**: Defined `Mission` and `MissionResult` frozen dataclasses in `src/wardline/missions/models.py`. Implemented 5 educational missions (`m01`..`m05`) covering availability, identity, rate limiting, observability, and recovery in `src/wardline/missions/catalog.py` with strict absence of forbidden offensive jargon.
+* **Automated Mission Checks**: Implemented `check_m01`..`check_m05` in `src/wardline/missions/checks.py` exercising real service health and logging probes, authentication and authorization boundaries, burst token bucket enforcement, connection pressure observability, and complete incident resolution cycles.
+* **Safe Mission Runner**: Implemented `run_check` in `src/wardline/missions/runner.py` capturing unexpected exceptions to return failing `MissionResult` without raising 500 or exposing traces.
+* **Mission API**: Exposed `GET /missions`, `GET /missions/{id}`, and `POST /missions/{id}/check` requiring viewer for read operations and operator for check executions.
+* **Mission Documentation**: Documented all five missions, objectives, concepts, required actions, execution guides, and conceptual explanations in `docs/missions.md`.
+* **Testing**: Added unit and integration tests in `tests/unit/test_mission_catalog.py` and `tests/integration/test_mission_checks.py`.
+
 

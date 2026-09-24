@@ -53,6 +53,7 @@ class MetricsRegistry:
             "incidents_open": 0,
             "blocked_clients": 0,
         }
+        self.log_lines_total: int = 0
 
     def bump(self, section: str, field: str, n: int = 1) -> None:
         sections = {"http": self._http, "security": self._security}

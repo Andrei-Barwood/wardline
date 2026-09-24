@@ -14,6 +14,22 @@ _HANDLER_MARK = "_wardline_handler"
 _EXTRA_FIELDS = ("client_id", "event_type", "status_code", "duration_ms", "method", "path")
 
 
+class LogProbe:
+    """Tracks local log line emissions for defensive health and mission verification."""
+
+    def __init__(self) -> None:
+        self.log_lines_total: int = 0
+
+    def record_line(self) -> None:
+        self.log_lines_total += 1
+
+    def reset(self) -> None:
+        self.log_lines_total = 0
+
+
+GLOBAL_LOG_PROBE = LogProbe()
+
+
 class _RedactingFormatter(logging.Formatter):
     """Emit one log record as JSON, or as a single readable line."""
 
@@ -23,6 +39,7 @@ class _RedactingFormatter(logging.Formatter):
         self._as_json = as_json
 
     def format(self, record: logging.LogRecord) -> str:
+        GLOBAL_LOG_PROBE.record_line()
         payload: dict[str, Any] = {
             "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
