@@ -85,6 +85,7 @@ class MemoryConfigHistory:
     def previous(self) -> dict[str, Any] | None:
         if not self._stack:
             return None
+        self._generation += 1
         return dict(self._stack.pop())
 
     def current_generation(self) -> int:

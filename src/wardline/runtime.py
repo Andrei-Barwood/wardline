@@ -46,6 +46,11 @@ class AppState:
     anomaly: AnomalyDetector
     bindings: dict[str, str]
 
+    def replace_settings(self, new_settings: Settings) -> None:
+        """Replace the active settings with new_settings."""
+        validate_settings(new_settings)
+        self.settings = new_settings
+
 
 def build_state(settings: Settings, *, clock: Clock | None = None) -> AppState:
     """Validate settings and wire the null or in-memory components.

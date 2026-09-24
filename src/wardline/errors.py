@@ -1,4 +1,4 @@
-"""Stable errors raised inside the Wardline process."""
+from typing import Any
 
 from wardline.contracts import ErrorCode
 
@@ -6,10 +6,17 @@ from wardline.contracts import ErrorCode
 class WardlineError(Exception):
     """Domain error that later prompts map to an HTTP or protocol response."""
 
-    def __init__(self, code: ErrorCode, message: str, source: str | None = None) -> None:
+    def __init__(
+        self,
+        code: ErrorCode,
+        message: str,
+        source: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
         self.code = code
         self.message = message
         self.source = source if source is not None else "http"
+        self.details = details
         super().__init__(message)
 
 

@@ -42,3 +42,12 @@ El formato sigue Keep a Changelog.
 * **Incident & Admin API**: Added `GET /incidents`, `GET /incidents/{id}`, `POST /incidents/{id}/acknowledge`, `POST /incidents/{id}/contain`, `POST /incidents/{id}/resolve`, and `POST /admin/clients/{client_id}/unblock`.
 * **Testing**: Added tests in `tests/unit/test_incident_machine.py`, `tests/integration/test_incident_routes.py`, and `tests/security/test_incident_authorization.py`.
 
+### PROMPT 17 — Sistema de recuperación
+* **Health Recovery Gate**: Implemented `LocalHealthGate` in `src/wardline/incidents/recovery.py` with real local socket probes for TCP and UDP, in-process loopback deadlock-free HTTP checking via `HealthRegistry`, and strict loopback host restrictions.
+* **Selective Incident Unblock**: Extended `BlockRegistry` with `unblock_incident(client_id, incident_id)` to selectively remove incident-specific blocks while maintaining blocks tied to other incidents.
+* **Incident Resolution Flow**: Coordinated `IncidentService.resolve` with `LocalHealthGate`. Moving from `CONTAINED` transitions to `RECOVERING`, and transitions to `RESOLVED` with selective unblocking if health checks pass. Retries from `RECOVERING` with failing health return 409 `invalid_state_transition` with `details.health`.
+* **Operational Config Whitelist & Rollback**: Added whitelist validation for operational parameters, `GET /admin/config`, `POST /admin/config`, `POST /admin/recovery/rollback`, and `POST /admin/clients/{id}/block`. Rollback and patches immediately reflect on rate limiters and runtime components.
+* **Safe Reset Utility**: Implemented `safe_reset(data_dir: Path)` in `src/wardline/storage/cleanup.py` and `scripts/reset.sh` to safely purge local databases and `.jsonl` data files while strictly rejecting paths outside `data/`.
+* **Testing**: Added test suites in `tests/unit/test_config_rollback.py`, `tests/integration/test_recovery_flow.py`, and `tests/security/test_rollback_whitelist.py`.
+
+

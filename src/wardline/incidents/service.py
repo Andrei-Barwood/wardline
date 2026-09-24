@@ -1,6 +1,7 @@
+import inspect
 import re
 from datetime import timedelta
-from typing import Protocol
+from typing import Any, Protocol
 
 from wardline.auth.api_keys import parse_dev_api_keys
 from wardline.clients.identity import validate_client_id
@@ -14,6 +15,7 @@ from wardline.contracts import (
 from wardline.errors import WardlineError
 from wardline.incidents.machine import transition
 from wardline.incidents.models import Incident, new_incident_id
+from wardline.incidents.recovery import LocalHealthGate
 from wardline.runtime import AppState
 from wardline.security.events import record_event
 from wardline.security.redaction import redact
@@ -31,7 +33,7 @@ def validate_incident_id(incident_id: str) -> str:
 class HealthGate(Protocol):
     """Protocol for checking system health before completing resolution."""
 
-    def check(self) -> bool:
+    def check(self) -> Any:
         """Return True if health passes, False otherwise."""
 
 
@@ -46,11 +48,38 @@ class UnverifiedHealth:
 
 
 class IncidentService:
-    def __init__(self, state: AppState, health_gate: HealthGate | None = None) -> None:
+    def __init__(self, state: AppState, health_gate: Any | None = None) -> None:
         self.state = state
-        self.health_gate: HealthGate = (
-            health_gate if health_gate is not None else UnverifiedHealth()
+        self.health_gate: Any = (
+            health_gate if health_gate is not None else LocalHealthGate()
         )
+
+    async def _check_health(self) -> tuple[bool, dict[str, Any] | None]:
+        gate = self.health_gate
+        check_fn = getattr(gate, "check", None)
+        if check_fn is None:
+            return False, None
+        try:
+            res = check_fn(self.state)
+        except TypeError:
+            res = check_fn()
+        if inspect.isawaitable(res):
+            is_healthy = bool(await res)
+        else:
+            is_healthy = bool(res)
+
+        report: dict[str, Any] | None = None
+        report_fn = getattr(gate, "report", None)
+        if report_fn is not None:
+            try:
+                rep = report_fn(self.state)
+            except TypeError:
+                rep = report_fn()
+            if inspect.isawaitable(rep):
+                report = await rep
+            else:
+                report = rep
+        return is_healthy, report
 
     def _redact_note(self, note: str) -> str:
         if not note:
@@ -114,21 +143,16 @@ class IncidentService:
         self.state.incidents.save(updated)
         return updated
 
-    def resolve(self, incident_id: str, *, actor: str, note: str = "") -> Incident:
+    async def resolve(self, incident_id: str, *, actor: str, note: str = "") -> Incident:
         """Resolve an incident, coordinating with HealthGate.
 
-        resolve llama a transition(..., "resolve") que deja RECOVERING,
-        luego llama a un protocolo HealthGate.check() -> bool.
-        En este prompt el HealthGate por defecto es AlwaysHealthy en tests
-        que lo pidan y UnverifiedHealth en producción, cuyo check() devuelve False.
-        Así, sin el prompt 17, resolve deja RECOVERING y responde 200, no 409,
-        porque la transición a RECOVERING sí fue legal. El 409 del contrato aparece
-        cuando se reintenta resolve desde RECOVERING y la salud sigue en False: el
-        segundo resolve intenta cerrar y la salud falla, 409, estado se queda RECOVERING.
-        Primer resolve desde CONTAINED: siempre puede entrar en RECOVERING aunque
-        la salud falle; el fallo de salud impide RESOLVED.
-        Ajusta el mensaje 409 a invalid_state_transition.
-        Esta semántica queda congelada para el prompt 17.
+        If state is CONTAINED: moves to RECOVERING (saves action). Then checks health.
+        If healthy: moves to RESOLVED, performs selective unblock, saves action.
+        If unhealthy: remains in RECOVERING, returns recovering incident (200).
+
+        If state is RECOVERING: checks health.
+        If healthy: moves to RESOLVED, performs selective unblock, saves action.
+        If unhealthy: raises WardlineError(invalid_state_transition, details={"health": report}).
         """
         incident = self.get(incident_id)
         redacted_note = self._redact_note(note)
@@ -140,13 +164,15 @@ class IncidentService:
             self.state.incidents.save(recovering)
 
             # Check health gate
-            if self.health_gate.check():
+            is_healthy, _ = await self._check_health()
+            if is_healthy:
                 resolved = transition(
                     recovering, "resolve", actor=actor, now=now, note=redacted_note
                 )
                 if incident.source != "system":
                     try:
-                        self.state.blocks.unblock(validate_client_id(incident.source))
+                        valid_client = validate_client_id(incident.source)
+                        self.state.blocks.unblock_incident(valid_client, incident.id)
                     except WardlineError:
                         pass
                 self.state.incidents.save(resolved)
@@ -155,13 +181,20 @@ class IncidentService:
             return recovering
 
         elif incident.state == IncidentState.RECOVERING:
-            if not self.health_gate.check():
-                raise WardlineError(ErrorCode.invalid_state_transition, "invalid state transition")
+            is_healthy, report = await self._check_health()
+            if not is_healthy:
+                details = {"health": report} if report is not None else None
+                raise WardlineError(
+                    ErrorCode.invalid_state_transition,
+                    "invalid state transition",
+                    details=details,
+                )
 
             resolved = transition(incident, "resolve", actor=actor, now=now, note=redacted_note)
             if incident.source != "system":
                 try:
-                    self.state.blocks.unblock(validate_client_id(incident.source))
+                    valid_client = validate_client_id(incident.source)
+                    self.state.blocks.unblock_incident(valid_client, incident.id)
                 except WardlineError:
                     pass
             self.state.incidents.save(resolved)

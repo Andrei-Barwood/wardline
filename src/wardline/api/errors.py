@@ -8,15 +8,23 @@ from wardline.contracts import ErrorCode
 from wardline.errors import WardlineError
 
 
-def error_payload(code: ErrorCode, message: str, correlation_id: str) -> dict[str, Any]:
+def error_payload(
+    code: ErrorCode,
+    message: str,
+    correlation_id: str,
+    details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build the stable error document."""
-    return {
+    doc: dict[str, Any] = {
         "error": {
             "code": code.value,
             "message": message,
             "correlation_id": correlation_id,
         }
     }
+    if details is not None:
+        doc["error"]["details"] = details
+    return doc
 
 
 def correlation_id_from(request: Request) -> str:
@@ -44,6 +52,12 @@ def status_for(code: ErrorCode) -> int:
 
 def wardline_error_payload(error: WardlineError, correlation_id: str) -> dict[str, Any]:
     """Public message for a domain error. Internal failures stay generic."""
+    details = getattr(error, "details", None)
     if error.code == ErrorCode.internal:
         return error_payload(ErrorCode.internal, "internal error", correlation_id)
-    return error_payload(error.code, error.message, correlation_id)
+    return error_payload(
+        error.code,
+        error.message,
+        correlation_id,
+        details=details if isinstance(details, dict) else None,
+    )

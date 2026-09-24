@@ -28,7 +28,10 @@ class BlockRegistry(Protocol):
         """Return whether the client id is blocked at the given instant."""
 
     def unblock(self, client_id: str) -> bool:
-        """Remove blocks for the client id. Return False when nothing changed."""
+        """Remove all blocks for the client id. Return False when nothing active changed."""
+
+    def unblock_incident(self, client_id: str, incident_id: str) -> bool:
+        """Remove blocks for client_id associated with incident_id. Return False if none active."""
 
     def count_active(self, now: datetime) -> int:
         """Return the number of active blocks at the given instant."""
@@ -46,31 +49,50 @@ class InMemoryBlockRegistry:
     """
 
     def __init__(self) -> None:
-        self._blocks: dict[str, BlockInfo] = {}
+        self._blocks: dict[str, list[BlockInfo]] = {}
 
     def block(self, client_id: str, *, until: datetime, reason: str, incident_id: str) -> None:
-        self._blocks[client_id] = BlockInfo(until=until, reason=reason, incident_id=incident_id)
+        entry = BlockInfo(until=until, reason=reason, incident_id=incident_id)
+        if client_id not in self._blocks:
+            self._blocks[client_id] = []
+        # Replace existing block for same incident_id if present, else append
+        self._blocks[client_id] = [
+            b for b in self._blocks[client_id] if b.incident_id != incident_id
+        ]
+        self._blocks[client_id].append(entry)
 
     def is_blocked(self, client_id: str, now: datetime) -> bool:
-        info = self._blocks.get(client_id)
-        if info is None:
+        blocks = self._blocks.get(client_id)
+        if not blocks:
             return False
-        if now >= info.until:
-            return False
-        return True
+        return any(b.until > now for b in blocks)
 
     def unblock(self, client_id: str) -> bool:
-        info = self._blocks.pop(client_id, None)
-        if info is None:
+        blocks = self._blocks.pop(client_id, None)
+        if not blocks:
             return False
-        # If the block was already expired, nothing active changed
         now = datetime.now(UTC)
-        if now >= info.until:
+        return any(b.until > now for b in blocks)
+
+    def unblock_incident(self, client_id: str, incident_id: str) -> bool:
+        blocks = self._blocks.get(client_id)
+        if not blocks:
             return False
-        return True
+        now = datetime.now(UTC)
+        had_active = any(b.incident_id == incident_id and b.until > now for b in blocks)
+        remaining = [b for b in blocks if b.incident_id != incident_id]
+        if remaining:
+            self._blocks[client_id] = remaining
+        else:
+            self._blocks.pop(client_id, None)
+        return had_active
 
     def count_active(self, now: datetime) -> int:
-        return sum(1 for info in self._blocks.values() if info.until > now)
+        return sum(1 for blocks in self._blocks.values() if any(b.until > now for b in blocks))
 
     def list_active(self, now: datetime) -> list[str]:
-        return [client_id for client_id, info in self._blocks.items() if info.until > now]
+        return [
+            client_id
+            for client_id, blocks in self._blocks.items()
+            if any(b.until > now for b in blocks)
+        ]

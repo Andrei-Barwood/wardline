@@ -101,5 +101,5 @@ async def resolve_incident(
     validate_incident_id(incident_id)
     service = IncidentService(state)
     note = payload.note if payload is not None else ""
-    updated = service.resolve(incident_id, actor=principal.client_id, note=note)
+    updated = await service.resolve(incident_id, actor=principal.client_id, note=note)
     return incident_to_dict(updated)

@@ -133,7 +133,7 @@ def test_input_incident_is_not_mutated() -> None:
     assert new_inc.state == IncidentState.INVESTIGATING
 
 
-def test_resolve_reaches_resolved_when_healthy(tmp_path: Path) -> None:
+async def test_resolve_reaches_resolved_when_healthy(tmp_path: Path) -> None:
     from wardline.config.settings import Settings
 
     settings = Settings(database_url=f"sqlite:///{tmp_path / 'w.db'}")
@@ -153,7 +153,7 @@ def test_resolve_reaches_resolved_when_healthy(tmp_path: Path) -> None:
     assert cnt.state == IncidentState.CONTAINED
 
     # Resolve with AlwaysHealthy reaches RESOLVED!
-    res = service.resolve(inc.id, actor="admin-1")
+    res = await service.resolve(inc.id, actor="admin-1")
     assert res.state == IncidentState.RESOLVED
     assert len(res.actions) == 4  # acknowledge, contain, resolve->RECOVERING, resolve->RESOLVED
 
