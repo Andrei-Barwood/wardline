@@ -1,5 +1,5 @@
-from pathlib import Path
 import re
+from pathlib import Path
 
 def test_threat_model_shape():
     path = Path("docs/threat-model.md")
@@ -27,7 +27,10 @@ def test_threat_model_shape():
     for label in required_labels:
         # We check that the label appears 9 times (once per threat)
         # Using count to verify rough shape
-        assert content.count(f"**{label}**") >= 9 or content.count(f"{label}:") >= 9 or content.count(label) >= 9, f"Missing {label} in threat model"
+        c1 = content.count(f"**{label}**") >= 9
+        c2 = content.count(f"{label}:") >= 9
+        c3 = content.count(label) >= 9
+        assert c1 or c2 or c3, f"Missing {label} in threat model"
         
     # Check for the 10 principles
     expected_principles = [
@@ -43,7 +46,8 @@ def test_threat_model_shape():
         "recovery"
     ]
     for principle in expected_principles:
-        assert principle in content or f"**{principle}**" in content, f"Missing principle: {principle}"
+        found = principle in content or f"**{principle}**" in content
+        assert found, f"Missing principle: {principle}"
         
     # Prohibited words
     prohibited = ["metasploit", "nmap", "shellcode", "iptables"]
@@ -54,7 +58,8 @@ def test_threat_model_shape():
     # Requires inprocess
     assert "inprocess" in content, "Missing 'inprocess' reference"
     
-    # Verify that the detected event types (inside backticks) starting with specific prefixes are found in src/
+    # Verify that the detected event types (inside backticks) starting with 
+    # specific prefixes are found in src/
     event_types = set()
     for match in re.finditer(r'`(security_[a-z_]+|anomaly_[a-z_]+|simulated_[a-z_]+)`', content):
         event_types.add(match.group(1))

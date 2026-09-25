@@ -86,10 +86,8 @@ def test_hardening_no_cors_or_static():
         assert "mount" not in content and "mount(" not in content, f"mount() found in {file}"
 
 def test_hardening_error_500_no_traceback():
-    from wardline.api.app import _install_handlers
-    from wardline.errors import ErrorCode
-    import json
     import asyncio
+    import json
     
     app = create_app()
     handler = app.exception_handlers.get(Exception)
@@ -111,9 +109,10 @@ def test_hardening_error_500_no_traceback():
 @pytest.mark.asyncio
 async def test_hardening_inprocess_simulator_no_sockets(monkeypatch):
     import socket
-    from wardline.simulation.engine import simulate_all
-    from wardline.runtime import build_state
+
     from wardline.config.settings import load_settings
+    from wardline.runtime import build_state
+    from wardline.simulation.engine import simulate_all
     
     called_sockets = []
     
