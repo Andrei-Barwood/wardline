@@ -41,6 +41,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    container: int = 0
     app_name: str = "wardline"
     app_version: str = __version__
     environment: str = "local"
@@ -122,9 +123,15 @@ def validate_settings(settings: Settings) -> None:
     than 0 or 1024..65535, or a database URL that does not start with sqlite.
     This function does not open a socket or a database file.
     """
+    container_flag = getattr(settings, "container", 0) == 1
     for name in ("http_host", "tcp_host", "udp_host"):
         host = getattr(settings, name)
-        if host not in LOOPBACK_HOSTS:
+        if host == "container":
+            if container_flag:
+                setattr(settings, name, "0.0.0.0")
+            else:
+                raise WardlineError(ErrorCode.validation_error, f"{name} 'container' requires WARDLINE_CONTAINER=1") # noqa: E501
+        elif host not in LOOPBACK_HOSTS:
             raise WardlineError(ErrorCode.validation_error, f"{name} must be a loopback address")
     for name in ("http_port", "tcp_port", "udp_port"):
         if not _valid_port(getattr(settings, name)):

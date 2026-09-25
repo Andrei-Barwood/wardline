@@ -1,0 +1,23 @@
+services:
+  wardline:
+    build: .
+    image: wardline:latest
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:9001:9001"
+      - "127.0.0.1:9002:9002"
+    volumes:
+      - ./data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      - WARDLINE_CONTAINER=1
+      - WARDLINE_HTTP_HOST=container
+      - WARDLINE_TCP_HOST=container
+      - WARDLINE_UDP_HOST=container
+      - WARDLINE_DEV_API_KEYS=viewer:dev-viewer-key,operator:dev-operator-key,admin:dev-admin-key

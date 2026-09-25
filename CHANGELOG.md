@@ -78,3 +78,29 @@ El formato sigue Keep a Changelog.
 
 
 
+
+### PROMPT 21 — Tests de seguridad
+* **Test Isolation Enforcement**: Added `patched_create_connection` in `tests/security/conftest.py` that intercepts `socket.create_connection` to strictly block communication to non-loopback IPs during security tests.
+* **Security Matrix Testing**: Implemented 21-route explicit status code verification matrix across 4 roles (anonymous, viewer, operator, admin) in `tests/security/test_authz_matrix.py`.
+* **Public Surface Test**: Added `test_public_surface.py` directly introspecting FastAPI `app.routes` to guarantee `/docs`, `/redoc`, and `/openapi.json` are disabled.
+* **Input Bounds Testing**: Implemented TCP and UDP exact boundary conditions (`test_input_bounds.py`), validating drops at 4KB TCP line limits, 256B UDP payloads, and JSON key counts.
+* **Simulation Loopback Bound**: Added `test_simulation_bounds.py` asserting remote IP injection into `/simulation/run` gracefully fails validation.
+* **Secret Regression Testing**: Added `test_secret_regression.py` statically scanning Python sources against private keys and API tokens, and dynamically reading `data/audit/*.jsonl` ensuring keys are redacted.
+* **Logical Containment**: Added `test_containment_is_logical.py` verifying network isolation avoids relying on `iptables` or `os.system` via `monkeypatch`, and relies strictly on `state.blocks.is_blocked()`.
+* **Fail Closed Mechanisms**: Implemented `test_fail_closed.py` proving an empty string `dev_api_keys` config defaults to 401s on all roles, and verified failing anomaly detectors swallow exceptions but persist original valid security events.
+
+### PROMPT 22 — Docker
+* **Contenerización y Privilegios**: Se añadió `Dockerfile` basado en `python:3.12-slim` configurado para correr como usuario no privilegiado (`10001:10001`), con el sistema de archivos de solo lectura y un comprobador de estado integrado que consulta `/health` localmente.
+* **Seguridad en Compose**: Se creó `docker-compose.yml` que elimina todas las capabilities (`cap_drop: [ALL]`), evita nuevos privilegios (`security_opt: ["no-new-privileges:true"]`), establece una capa `/tmp` temporal, monta el volumen local de `data` y publica estrictamente los puertos ligados a `127.0.0.1`.
+* **Solución a la Tensión de Red**: Se implementó una variable especial de configuración (`WARDLINE_CONTAINER=1` y hosts en `"container"`) en `src/wardline/config/settings.py` que permite a Wardline enlazarse a `0.0.0.0` internamente dentro del contenedor. Se rechaza categóricamente el uso de la IP de interfaz genérica si no es en este contexto validado.
+* **Comprobación Estricta y Documentación**: Se añadió exclusión estricta de ficheros compilados y confidenciales mediante `.dockerignore`. Se creó `tests/unit/test_compose_bindings.py` para analizar el YAML como texto confirmando el uso de localhost, previniendo el uso del socket o modos red privilegiados de Docker. Finalmente, se documentó el proceso de despliegue en `docs/deployment.md`.
+
+### PROMPT 23 — GitHub Actions
+* **Flujo CI Restringido**: Implementado `.github/workflows/tests.yml` para correr en Ubuntu, ejecutando validación cruzada para Python 3.12 y 3.13.
+* **Seguridad Estricta de Workflow**: Workflow condicionado puramente a `permissions: contents: read`, sin llaves filtradas, deshabilitando cualquier target expuesto y bloqueando intencionalmente operaciones de publicación o inicio de sesión en registros externos.
+* **Tests de Cadena de Suministro**: Desarrollado `test_workflow_is_local.py` para análisis textual del workflow verificando localmente la presencia de analizadores (`ruff`, `mypy`, `pytest`) y la ausencia absoluta de directivas privilegiadas prohibidas (`docker login`, `pull_request_target`, `secrets.`).
+
+### PROMPT 24 — Documentación
+* **Arquitectura Transparente**: Se elaboró `docs/architecture.md` unificando esquemas ASCII de contratos y el diagrama de estados de los incidentes, detallando las reglas de los procesos por defecto (estrictos a loopback) y decisiones críticas del laboratorio (Rate Limits en memoria, Simulator acotado).
+* **Lineamientos de Comunidad**: Se integró `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` y `SECURITY.md` clarificando explícitamente el fin formativo y pasivo del laboratorio e instruyendo prohibiciones firmes a dependencias y simulaciones ofensivas.
+* **Revisión Continua**: Verificación de coherencia del registro con las implementaciones hasta la fecha (`CHANGELOG.md`) y confirmación de los roles expuestos en `deployment.md` y misiones de `missions.md`.
