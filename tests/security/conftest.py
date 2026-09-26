@@ -1,1 +1,1 @@
-from tests.integration.conftest import stack
+# empty conftest

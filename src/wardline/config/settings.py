@@ -130,7 +130,9 @@ def validate_settings(settings: Settings) -> None:
             if container_flag:
                 setattr(settings, name, "0.0.0.0")
             else:
-                raise WardlineError(ErrorCode.validation_error, f"{name} 'container' requires WARDLINE_CONTAINER=1") # noqa: E501
+                raise WardlineError(
+                    ErrorCode.validation_error, f"{name} 'container' requires WARDLINE_CONTAINER=1"
+                )  # noqa: E501
         elif host not in LOOPBACK_HOSTS:
             raise WardlineError(ErrorCode.validation_error, f"{name} must be a loopback address")
     for name in ("http_port", "tcp_port", "udp_port"):

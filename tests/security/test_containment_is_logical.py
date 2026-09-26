@@ -27,28 +27,34 @@ async def test_containment_is_logical(stack, monkeypatch):
         actions=[],
     )
     stack.state.incidents.add(incident)
-    
+
     def fake_popen(*args, **kwargs):
         pytest.fail("Subprocess called during containment!")
-        
+
     def fake_system(*args, **kwargs):
         pytest.fail("os.system called during containment!")
-        
+
     monkeypatch.setattr(subprocess, "Popen", fake_popen)
     monkeypatch.setattr(os, "system", fake_system)
-    
+
     async with AsyncClient(base_url=stack.base_url) as client:
-        r = await client.post(f"/incidents/{inc_id}/acknowledge", headers={"Authorization": "Bearer dev-admin-key"}) # noqa: E501
+        r = await client.post(
+            f"/incidents/{inc_id}/acknowledge", headers={"Authorization": "Bearer dev-admin-key"}
+        )  # noqa: E501
         assert r.status_code == 200
-        r = await client.post(f"/incidents/{inc_id}/contain", headers={"Authorization": "Bearer dev-admin-key"}) # noqa: E501
+        r = await client.post(
+            f"/incidents/{inc_id}/contain", headers={"Authorization": "Bearer dev-admin-key"}
+        )  # noqa: E501
         assert r.status_code == 200
-        
+
         assert stack.state.blocks.is_blocked("attacker-client", stack.state.clock.now())
         assert not stack.state.blocks.is_blocked("other_client", stack.state.clock.now())
+
 
 def test_no_iptables_in_src():
     import os
     from pathlib import Path
+
     src_dir = Path("src")
     for root, _, files in os.walk(src_dir):
         for file in files:

@@ -127,23 +127,23 @@ def test_settings_container_host():
 
     from wardline.config.settings import Settings
     from wardline.errors import WardlineError
-    
+
     # container=1 y host container => aceptado
     s = Settings(container=1, http_host="container", tcp_host="container", udp_host="container")
     assert s.http_host == "0.0.0.0"
     assert s.tcp_host == "0.0.0.0"
     assert s.udp_host == "0.0.0.0"
-    
+
     # container=0 y host container => rechazado
     with pytest.raises(WardlineError) as exc_info:
         Settings(container=0, http_host="container")
     assert "requires WARDLINE_CONTAINER=1" in str(exc_info.value)
-    
+
     # container=1 y host 203.0.113.10 => rechazado
     with pytest.raises(WardlineError) as exc_info:
         Settings(container=1, http_host="203.0.113.10")
     assert "must be a loopback address" in str(exc_info.value)
-    
+
     # container ausente y host 0.0.0.0 => rechazado
     with pytest.raises(WardlineError) as exc_info:
         Settings(http_host="0.0.0.0")

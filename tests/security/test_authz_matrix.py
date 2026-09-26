@@ -25,20 +25,26 @@ MATRIX = [
     ("POST", "/incidents/{incident_id}/contain", 401, 403, 403, 200),
     ("POST", "/incidents/{incident_id}/resolve", 401, 403, 403, 200),
     ("POST", "/admin/config", 401, 403, 403, 200),
-    ("POST", "/admin/recovery/rollback", 401, 403, 403, 409), 
+    ("POST", "/admin/recovery/rollback", 401, 403, 403, 409),
     ("GET", "/admin/config", 401, 403, 403, 200),
     ("POST", "/admin/clients/some-client/block", 401, 403, 403, 200),
     ("POST", "/admin/clients/some-client/unblock", 401, 403, 403, 404),
 ]
+
 
 def get_headers(role):
     if role is None:
         return {}
     return {"Authorization": f"Bearer dev-{role}-key"}
 
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize("method, path, anon_status, viewer_status, operator_status, admin_status", MATRIX) # noqa: E501
-async def test_authz_matrix(stack, method, path, anon_status, viewer_status, operator_status, admin_status): # noqa: E501
+@pytest.mark.parametrize(
+    "method, path, anon_status, viewer_status, operator_status, admin_status", MATRIX
+)  # noqa: E501
+async def test_authz_matrix(
+    stack, method, path, anon_status, viewer_status, operator_status, admin_status
+):  # noqa: E501
     def get_kwargs(m, p):
         payload = None
         if m == "POST":
@@ -51,13 +57,17 @@ async def test_authz_matrix(stack, method, path, anon_status, viewer_status, ope
         if payload is not None:
             return {"json": payload}
         return {}
-        
+
     async def call_as(role, expected_status, is_admin=False):
         # Fresh incident for each role test so we don't hit 409 State Transition Error
         inc_id = f"inc_{uuid.uuid4().hex[:12]}"
         incident = Incident(
             id=inc_id,
-            state=IncidentState.DETECTED if "contain" not in path and "resolve" not in path else IncidentState.INVESTIGATING if "contain" in path else IncidentState.CONTAINED, # noqa: E501
+            state=IncidentState.DETECTED
+            if "contain" not in path and "resolve" not in path
+            else IncidentState.INVESTIGATING
+            if "contain" in path
+            else IncidentState.CONTAINED,  # noqa: E501
             title="Test Incident",
             source="system",
             service=ServiceName.TCP,
@@ -69,19 +79,22 @@ async def test_authz_matrix(stack, method, path, anon_status, viewer_status, ope
             actions=[],
         )
         stack.state.incidents.add(incident)
-        
+
         # for unblock, admin gets 404 if not blocked. If we want 200 we should block it, but matrix expects 404. # noqa: E501
-        
+
         actual_path = path.replace("{incident_id}", inc_id)
-        
+
         async with AsyncClient(base_url=stack.base_url) as client:
-            r = await client.request(method, actual_path, headers=get_headers(role), **get_kwargs(method, actual_path)) # noqa: E501
+            r = await client.request(
+                method, actual_path, headers=get_headers(role), **get_kwargs(method, actual_path)
+            )  # noqa: E501
             assert r.status_code == expected_status
-            
+
     await call_as(None, anon_status)
     await call_as("viewer", viewer_status)
     await call_as("operator", operator_status)
     await call_as("admin", admin_status, is_admin=True)
+
 
 @pytest.mark.asyncio
 async def test_authz_matrix_missing_incident(stack):
@@ -90,6 +103,7 @@ async def test_authz_matrix_missing_incident(stack):
         assert r.status_code == 403
         r = await client.post("/incidents/missing/acknowledge", headers=get_headers("admin"))
         assert r.status_code == 404
+
 
 def test_meta_matrix_rows(stack):
     assert len(MATRIX) >= 20

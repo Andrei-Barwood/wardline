@@ -1,12 +1,13 @@
 import re
 from pathlib import Path
 
+
 def test_threat_model_shape():
     path = Path("docs/threat-model.md")
     assert path.exists(), "Threat model file does not exist"
-    
+
     content = path.read_text(encoding="utf-8")
-    
+
     # Check for the nine threat titles (H2)
     expected_threats = [
         "## Abuso de autenticación",
@@ -21,7 +22,7 @@ def test_threat_model_shape():
     ]
     for threat in expected_threats:
         assert threat in content, f"Missing threat title: {threat}"
-        
+
     # Check for headers inside the sections
     required_labels = ["Attack surface", "Impact", "Detection", "Mitigation", "Recovery"]
     for label in required_labels:
@@ -31,7 +32,7 @@ def test_threat_model_shape():
         c2 = content.count(f"{label}:") >= 9
         c3 = content.count(label) >= 9
         assert c1 or c2 or c3, f"Missing {label} in threat model"
-        
+
     # Check for the 10 principles
     expected_principles = [
         "least privilege",
@@ -43,33 +44,33 @@ def test_threat_model_shape():
         "observability",
         "auditability",
         "graceful degradation",
-        "recovery"
+        "recovery",
     ]
     for principle in expected_principles:
         found = principle in content or f"**{principle}**" in content
         assert found, f"Missing principle: {principle}"
-        
+
     # Prohibited words
     prohibited = ["metasploit", "nmap", "shellcode", "iptables"]
     content_lower = content.lower()
     for word in prohibited:
         assert word not in content_lower, f"Prohibited word found: {word}"
-        
+
     # Requires inprocess
     assert "inprocess" in content, "Missing 'inprocess' reference"
-    
-    # Verify that the detected event types (inside backticks) starting with 
+
+    # Verify that the detected event types (inside backticks) starting with
     # specific prefixes are found in src/
     event_types = set()
-    for match in re.finditer(r'`(security_[a-z_]+|anomaly_[a-z_]+|simulated_[a-z_]+)`', content):
+    for match in re.finditer(r"`(security_[a-z_]+|anomaly_[a-z_]+|simulated_[a-z_]+)`", content):
         event_types.add(match.group(1))
-        
+
     assert len(event_types) > 0, "No event types found in detection sections"
-    
+
     # We should scan src/ to see if the string literally exists in .py files
     src_dir = Path("src")
     py_files = list(src_dir.rglob("*.py"))
-    
+
     for etype in event_types:
         found = False
         for fpath in py_files:
