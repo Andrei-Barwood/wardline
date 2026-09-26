@@ -19,6 +19,7 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.pool import StaticPool
 
 from wardline.contracts import (
     SEVERITY_RANK,
@@ -88,11 +89,15 @@ def _init_sqlite_engine(db_path: str) -> Engine:
         path = db_path
 
     dir_name = os.path.dirname(path)
-    if dir_name:
+    if dir_name and path != ":memory:":
         os.makedirs(dir_name, exist_ok=True)
 
     url = f"sqlite:///{path}"
-    engine = create_engine(url, connect_args={"check_same_thread": False})
+    kwargs = {"connect_args": {"check_same_thread": False}}
+    if path == ":memory:" or path == "":
+        kwargs["poolclass"] = StaticPool
+
+    engine = create_engine(url, **kwargs)
     with engine.connect() as conn:
         metadata.create_all(engine)
         conn.exec_driver_sql("PRAGMA journal_mode=WAL")
