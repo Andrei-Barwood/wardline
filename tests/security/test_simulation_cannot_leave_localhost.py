@@ -4,7 +4,6 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from wardline.api.app import create_app
-from wardline.config import Settings
 from wardline.runtime import build_state
 from wardline.simulation.engine import (
     simulate_burst,
@@ -17,13 +16,13 @@ from wardline.simulation.scenarios import SimulationMode, SimulationRefused
 
 
 @pytest.mark.asyncio
-async def test_inprocess_does_not_open_sockets(monkeypatch):
+async def test_inprocess_does_not_open_sockets(monkeypatch, settings_factory):
     def fake_socket(*args, **kwargs):
         raise RuntimeError("Network is disabled in inprocess mode")
 
     monkeypatch.setattr(socket, "socket", fake_socket)
 
-    state = build_state(Settings(wardline_env="test", database_url="sqlite:///:memory:"))
+    state = build_state(settings_factory(wardline_env="test", database_url="sqlite:///:memory:"))
     for scenario in [
         simulate_burst,
         simulate_udp_burst,
@@ -49,13 +48,15 @@ def test_assert_loopback_rejects_external():
 
 
 @pytest.mark.asyncio
-async def test_route_schema_rejects_host_parameter_and_socket_not_called(monkeypatch):
+async def test_route_schema_rejects_host_parameter_and_socket_not_called(
+    monkeypatch, settings_factory
+):
     def fake_socket(*args, **kwargs):
         raise RuntimeError("socket.socket should not be called")
 
     monkeypatch.setattr(socket, "socket", fake_socket)
 
-    state = build_state(Settings(wardline_env="test", database_url="sqlite:///:memory:"))
+    state = build_state(settings_factory(wardline_env="test", database_url="sqlite:///:memory:"))
     app = create_app(state)
     transport = ASGITransport(app=app)
 

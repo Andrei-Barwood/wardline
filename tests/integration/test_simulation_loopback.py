@@ -23,13 +23,13 @@ async def run_server(app: FastAPI, port: int):
 
 
 @pytest.mark.asyncio
-async def test_loopback_burst_hits_local_health_only():
+async def test_loopback_burst_hits_local_health_only(settings_factory: Callable[..., Settings]):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
     sock.close()
 
-    settings = Settings(wardline_env="test", http_port=port, http_host="127.0.0.1")
+    settings = settings_factory(wardline_env="test", http_port=port, http_host="127.0.0.1")
     state = build_state(settings)
     app = create_app(state)
 
@@ -49,8 +49,8 @@ async def test_loopback_burst_hits_local_health_only():
 
 
 @pytest.mark.asyncio
-async def test_loopback_udp_sends_at_most_budget():
-    settings = Settings(wardline_env="test", udp_port=0, udp_host="127.0.0.1")
+async def test_loopback_udp_sends_at_most_budget(settings_factory: Callable[..., Settings]):
+    settings = settings_factory(wardline_env="test", udp_port=0, udp_host="127.0.0.1")
     state = build_state(settings)
     await simulate_udp_burst(state, mode=SimulationMode.loopback)
 

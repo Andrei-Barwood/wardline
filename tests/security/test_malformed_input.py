@@ -3,7 +3,6 @@ import asyncio
 import pytest
 
 from wardline.auth.provider import AuthProvider
-from wardline.config.settings import Settings
 from wardline.contracts import ErrorCode, Principal
 from wardline.errors import WardlineError
 from wardline.runtime import build_state
@@ -40,8 +39,8 @@ def test_token_over_128_does_not_call_registry():
 
 
 @pytest.mark.asyncio
-async def test_malformed_tcp_line_still_within_error_budget(unused_tcp_port):
-    state = build_state(Settings(wardline_env="test", tcp_port=unused_tcp_port))
+async def test_malformed_tcp_line_still_within_error_budget(unused_tcp_port, settings_factory):
+    state = build_state(settings_factory(wardline_env="test", tcp_port=unused_tcp_port))
 
     running = await start_tcp(state)
 
