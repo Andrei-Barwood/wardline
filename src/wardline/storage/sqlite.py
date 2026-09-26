@@ -93,7 +93,9 @@ def _init_sqlite_engine(db_path: str) -> Engine:
         os.makedirs(dir_name, exist_ok=True)
 
     url = f"sqlite:///{path}"
-    kwargs = {"connect_args": {"check_same_thread": False}}
+    import typing
+
+    kwargs: dict[str, typing.Any] = {"connect_args": {"check_same_thread": False}}
     if path == ":memory:" or path == "":
         kwargs["poolclass"] = StaticPool
 
